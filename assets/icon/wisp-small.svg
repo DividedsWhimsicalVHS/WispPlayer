@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>Wisp Player (small sizes)</title>
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8eed6"/>
+      <stop offset="1" stop-color="#d6c7a3"/>
+    </linearGradient>
+  </defs>
+  <!-- body with the red stripe -->
+  <rect x="1" y="4" width="30" height="24" rx="4" fill="url(#body)"/>
+  <path d="M1 8a4 4 0 0 1 4-4h22a4 4 0 0 1 4 4v1H1z" fill="#f0304f"/>
+  <!-- window: label strip and two reels -->
+  <rect x="4" y="10" width="24" height="11" rx="2" fill="#1c1b24"/>
+  <rect x="6" y="11.3" width="20" height="2.2" rx="1" fill="#efe3c4"/>
+  <circle cx="11.2" cy="17.2" r="3" fill="#f4f1e8"/>
+  <circle cx="20.8" cy="17.2" r="3" fill="#f4f1e8"/>
+  <circle cx="11.2" cy="17.2" r="1.15" fill="#1c1b24"/>
+  <circle cx="20.8" cy="17.2" r="1.15" fill="#1c1b24"/>
+  <!-- keys: the red one is play -->
+  <rect x="4" y="23" width="5.2" height="3" rx="1" fill="#454350"/>
+  <rect x="10.4" y="23" width="5.2" height="3" rx="1" fill="#f0304f"/>
+  <rect x="16.8" y="23" width="5.2" height="3" rx="1" fill="#454350"/>
+  <rect x="23.2" y="23" width="4.8" height="3" rx="1" fill="#454350"/>
+</svg>

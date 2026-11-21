@@ -1,0 +1,104 @@
+import { Theme, Icons } from "theme.slint";
+import { Icon } from "widgets.slint";
+import { App } from "state.slint";
+
+/// Synchronized lyrics scroll so the current line sits above the middle; plain lyrics just scroll.
+export component LyricsView inherits Rectangle {
+    clip: true;
+
+    // Scrolls so a line at (y, h) sits at ~34% of the view. The bottom padding of the column keeps
+    // the last line reachable, so only the top needs clamping.
+    public function follow(y: length, h: length) {
+        flick.content-y = min(0px, -(y + h / 2 - root.height * 0.34));
+    }
+
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        mouse-drag-pan-enabled: false;
+        animate content-y { duration: 480ms; easing: ease-in-out; }
+
+        VerticalLayout {
+            width: flick.width;
+            padding-top: root.height * 0.34;
+            padding-bottom: root.height * 0.6;
+            spacing: 6px;
+            for line[i] in App.lyrics: item := Rectangle {
+                property <bool> is-active: App.lyrics-synced && i == App.lyrics-active;
+                // Layout settles a moment after a line is created, so the first scroll to an
+                // already-active line is done by a one-shot timer (only the active line has one).
+                property <bool> settled: false;
+                height: line.text == "" ? 26px : txt.preferred-height + 8px;
+                changed is-active => {
+                    self.settled = false;
+                    if (self.is-active) {
+                        root.follow(self.y, self.height);
+                    }
+                }
+                changed y => {
+                    if (self.is-active) {
+                        root.follow(self.y, self.height);
+                    }
+                }
+                Timer {
+                    interval: 90ms;
+                    running: item.is-active && !item.settled;
+                    triggered => {
+                        root.follow(item.y, item.height);
+                        item.settled = true;
+                    }
+                }
+                txt := Text {
+                    x: 0px;
+                    y: 4px;
+                    width: parent.width - 24px;
+                    text: line.text;
+                    wrap: word-wrap;
+                    font-size: item.is-active ? 32px : 28px;
+                    font-weight: 700;
+                    color: Theme.text;
+                    opacity: !App.lyrics-synced ? 0.9 : item.is-active ? 1 : 0.34;
+                    animate opacity, font-size { duration: 300ms; easing: ease-out; }
+                }
+                TouchArea {
+                    enabled: App.lyrics-synced && line.text != "";
+                    mouse-cursor: pointer;
+                    clicked => { App.lyrics-seek(line.time); }
+                }
+            }
+        }
+    }
+
+    // Empty state.
+    if App.lyrics.length == 0: Rectangle {
+        VerticalLayout {
+            alignment: center;
+            spacing: 12px;
+            Rectangle {
+                height: 52px;
+                Icon {
+                    d: Icons.lyrics;
+                    width: 48px;
+                    height: 48px;
+                    x: (parent.width - self.width) / 2;
+                    tint: Theme.text-3;
+                }
+            }
+            Text {
+                text: App.lyrics-loading ? "Looking for lyrics…" : "No lyrics for this track";
+                font-size: 20px;
+                font-weight: 600;
+                color: Theme.text-2;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: "Put a .lrc file next to the song, or add lyrics to its tags.";
+                font-size: 14px;
+                color: Theme.text-3;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                visible: !App.lyrics-loading;
+            }
+        }
+    }
+}

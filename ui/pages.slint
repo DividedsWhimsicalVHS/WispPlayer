@@ -1,0 +1,1121 @@
+import { Theme, Icons } from "theme.slint";
+import { Icon, IconButton, PillButton, Segmented, Toggle, Slider, ListView, Cover, Soft, Bevel } from "widgets.slint";
+import { SongRow, QueueItem, AlbumCard, ArtistItem, FlaggedItem } from "rows.slint";
+import { App } from "state.slint";
+import { ThemeCard } from "types.slint";
+
+component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    height: 96px;
+
+    Text {
+        x: 28px;
+        y: 22px;
+        width: parent.width * 0.5;
+        text: root.title;
+        font-family: Theme.title-font;
+        font-size: 34px;
+        font-weight: 700;
+        color: Theme.text;
+        overflow: elide;
+    }
+    Text {
+        x: 30px;
+        y: 64px;
+        width: parent.width * 0.5;
+        text: root.subtitle;
+        font-size: 14px;
+        color: Theme.text-2;
+        overflow: elide;
+    }
+    HorizontalLayout {
+        x: parent.width * 0.4;
+        width: parent.width * 0.6;
+        height: 36px;
+        y: 30px;
+        padding-right: 24px;
+        spacing: 10px;
+        alignment: end;
+        @children
+    }
+}
+
+/// "Showing: <artist>   x" pill under a header when a filter is active.
+component FilterChip inherits Rectangle {
+    height: 30px;
+    width: chip.preferred-width + 20px;
+    border-radius: 15px * Theme.rounding;
+    background: Theme.accent.with-alpha(0.16);
+    chip := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 6px;
+        spacing: 6px;
+        Text {
+            text: App.filter-label;
+            font-size: 13px;
+            font-weight: 600;
+            color: Theme.accent-text;
+            vertical-alignment: center;
+        }
+        IconButton {
+            d: Icons.close;
+            label: "Clear filter";
+            size: 22px;
+            glyph: 12px;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.accent;
+            clicked => { App.clear-filter(); }
+        }
+    }
+}
+
+component EmptyState inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> detail;
+    VerticalLayout {
+        alignment: center;
+        spacing: 10px;
+        Rectangle {
+            height: 56px;
+            Icon {
+                d: root.icon;
+                width: 52px;
+                height: 52px;
+                x: (parent.width - self.width) / 2;
+                tint: Theme.text-3;
+            }
+        }
+        Text {
+            text: root.title;
+            font-size: 20px;
+            font-weight: 600;
+            color: Theme.text-2;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.detail;
+            font-size: 14px;
+            color: Theme.text-3;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component SongsPage inherits Rectangle {
+    property <length> head: App.filter-label != "" ? 134px : 100px;
+
+    PageHeader {
+        y: 0px;
+        title: "Songs";
+        subtitle: App.songs-subtitle;
+        Segmented {
+            width: 232px;
+            items: ["Title", "Album", "Recent"];
+            current: App.sort-index;
+            selected(i) => { App.sort-changed(i); }
+        }
+        PillButton {
+            text: "Shuffle";
+            d: Icons.shuffle;
+            primary: false;
+            compact: root.width < 720px;
+            clicked => { App.play-all(true); }
+        }
+        PillButton {
+            text: "Play";
+            d: Icons.play;
+            compact: root.width < 720px;
+            clicked => { App.play-all(false); }
+        }
+    }
+    if App.filter-label != "": FilterChip {
+        x: 28px;
+        y: 98px;
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for t[i] in App.tracks: SongRow {
+            track: t;
+            current: t.id == App.now-track;
+            playing: App.playing;
+            show-album: root.width > 780px;
+            play => { App.play-row(i); }
+            play-next => { App.play-next-row(i); }
+            enqueue => { App.enqueue-row(i); }
+            add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+        }
+    }
+    if App.tracks.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 220px;
+        icon: Icons.note;
+        title: App.scanning ? "Scanning your music…" : App.search-text != "" ? "No matches" : "No songs yet";
+        detail: App.scanning ? App.scan-text : App.search-text != "" ? "Try a different search." : "Add a music folder in Settings to build your library.";
+    }
+}
+
+export component AlbumsPage inherits Rectangle {
+    property <length> head: App.filter-label != "" ? 134px : 100px;
+    property <length> pad: 28px;
+    property <length> gap: 22px;
+    property <int> cols: max(2, floor((root.width - 2 * root.pad + root.gap) / (184px + root.gap)));
+    property <length> card-w: (root.width - 2 * root.pad - (root.cols - 1) * root.gap) / root.cols;
+    property <int> grid-rows: ceil(App.albums.length / root.cols);
+
+    PageHeader {
+        y: 0px;
+        title: "Albums";
+        subtitle: App.albums-subtitle;
+    }
+    if App.filter-label != "": FilterChip {
+        x: 28px;
+        y: 98px;
+    }
+    ListView {
+        y: root.head - 6px;
+        height: parent.height - root.head + 6px;
+        for r in root.grid-rows: Rectangle {
+            height: root.card-w + 52px + root.gap;
+            for c in root.cols: Rectangle {
+                if r * root.cols + c < App.albums.length: AlbumCard {
+                    x: root.pad + c * (root.card-w + root.gap);
+                    y: 6px;
+                    width: root.card-w;
+                    album: App.albums[r * root.cols + c];
+                    open => { App.open-album(r * root.cols + c); }
+                    play => { App.play-album(r * root.cols + c, false); }
+                }
+            }
+        }
+    }
+    if App.albums.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 220px;
+        icon: Icons.album;
+        title: App.scanning ? "Scanning your music…" : App.search-text != "" ? "No matches" : "No albums yet";
+        detail: App.scanning ? App.scan-text : App.search-text != "" ? "Try a different search." : "Add a music folder in Settings to build your library.";
+    }
+}
+
+export component ArtistsPage inherits Rectangle {
+    property <length> head: 100px;
+    PageHeader {
+        y: 0px;
+        title: "Artists";
+        subtitle: App.artists-subtitle;
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for a[i] in App.artists: ArtistItem {
+            artist: a;
+            open => { App.open-artist(i); }
+        }
+    }
+    if App.artists.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 200px;
+        icon: Icons.person;
+        title: App.search-text != "" ? "No matches" : "No artists yet";
+        detail: "Artists appear here once your library has been scanned.";
+    }
+}
+
+export component QueuePage inherits Rectangle {
+    property <length> head: 100px;
+    PageHeader {
+        y: 0px;
+        title: "Queue";
+        subtitle: App.queue-subtitle;
+        PillButton {
+            text: "Save as playlist";
+            d: Icons.playlist-add;
+            primary: false;
+            compact: root.width < 640px;
+            clicked => { App.open-dialog(4); }
+        }
+        PillButton {
+            text: "Clear";
+            d: Icons.trash;
+            primary: false;
+            clicked => { App.queue-clear(); }
+        }
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for q[i] in App.queue: QueueItem {
+            entry: q;
+            current: q.uid == App.now-uid;
+            playing: App.playing;
+            play => { App.queue-play(i); }
+            remove => { App.queue-remove(i); }
+        }
+    }
+    if App.queue.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 200px;
+        icon: Icons.queue;
+        title: "The queue is empty";
+        detail: "Play a song or album, or add songs with the + button.";
+    }
+}
+
+export component AlbumDetailPage inherits Rectangle {
+    property <length> head: 232px;
+
+    IconButton {
+        x: 14px;
+        y: 14px;
+        d: Icons.chevron-left;
+        label: "Back to albums";
+        clicked => { App.show-page(1); }
+    }
+    Cover {
+        x: 36px;
+        y: 52px;
+        width: 156px;
+        height: 156px;
+        art: App.detail-art;
+        has-art: App.detail-has-art;
+        seed: App.detail-seed;
+        radius: 14px * Theme.rounding;
+        shadow: true;
+    }
+    VerticalLayout {
+        x: 216px;
+        y: 52px;
+        width: parent.width - 216px - 28px;
+        height: 156px;
+        alignment: center;
+        spacing: 4px;
+        Text {
+            text: App.detail-title;
+            font-family: Theme.title-font;
+            font-size: 30px;
+            font-weight: 700;
+            color: Theme.text;
+            overflow: elide;
+        }
+        Text {
+            text: App.detail-artist;
+            font-size: 18px;
+            font-weight: 600;
+            color: Theme.accent-text;
+            overflow: elide;
+        }
+        Text {
+            text: App.detail-meta;
+            font-size: 13px;
+            color: Theme.text-2;
+            overflow: elide;
+        }
+        Rectangle {
+            height: 10px;
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+            height: 36px;
+            PillButton {
+                text: "Play";
+                d: Icons.play;
+                clicked => { App.play-all(false); }
+            }
+            PillButton {
+                text: "Shuffle";
+                d: Icons.shuffle;
+                primary: false;
+                clicked => { App.play-all(true); }
+            }
+        }
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for t[i] in App.tracks: SongRow {
+            track: t;
+            current: t.id == App.now-track;
+            playing: App.playing;
+            show-album: false;
+            play => { App.play-row(i); }
+            play-next => { App.play-next-row(i); }
+            enqueue => { App.enqueue-row(i); }
+            add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+        }
+    }
+}
+
+export component PlaylistPage inherits Rectangle {
+    property <length> head: 100px;
+    PageHeader {
+        y: 0px;
+        title: App.playlist-title;
+        subtitle: App.playlist-subtitle;
+        IconButton {
+            d: Icons.edit;
+            label: "Rename playlist";
+            tint: Theme.text-2;
+            clicked => { App.open-dialog(2); }
+        }
+        IconButton {
+            d: Icons.trash;
+            label: "Delete playlist";
+            tint: Theme.text-2;
+            clicked => { App.open-dialog(3); }
+        }
+        PillButton {
+            text: "Shuffle";
+            d: Icons.shuffle;
+            primary: false;
+            compact: root.width < 760px;
+            clicked => { App.play-all(true); }
+        }
+        PillButton {
+            text: "Play";
+            d: Icons.play;
+            compact: root.width < 760px;
+            clicked => { App.play-all(false); }
+        }
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for t[i] in App.tracks: SongRow {
+            track: t;
+            current: t.id == App.now-track;
+            playing: App.playing;
+            show-album: root.width > 780px;
+            removable: true;
+            play => { App.play-row(i); }
+            play-next => { App.play-next-row(i); }
+            enqueue => { App.enqueue-row(i); }
+            remove => { App.playlist-remove-row(i); }
+            add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+        }
+    }
+    if App.tracks.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 220px;
+        icon: Icons.playlist;
+        title: "This playlist is empty";
+        detail: "Add songs with the playlist button that appears when you point at a song.";
+    }
+}
+
+/// "14 Unidentified": the number of songs whose tags leave something out.
+component CountBadge inherits Rectangle {
+    in property <string> text;
+    height: 24px;
+    width: label.preferred-width + 22px;
+    border-radius: 12px * Theme.rounding;
+    background: Theme.accent;
+    label := Text {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-size: 12px;
+        font-weight: 700;
+        color: Theme.on-accent;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+/// Songs whose tags leave out an artist, a real title or a cover, each highlighted. Opening one
+/// starts the lookup in the track editor; nothing about a song changes until it is saved there.
+export component UnidentifiedPage inherits Rectangle {
+    property <length> head: 112px;
+    IconButton {
+        x: 14px;
+        y: 14px;
+        d: Icons.chevron-left;
+        label: "Back to settings";
+        clicked => { App.show-page(4); }
+    }
+    heading := Text {
+        x: 60px;
+        y: 16px;
+        text: "Unidentified tracks";
+        font-family: Theme.title-font;
+        font-size: 30px;
+        font-weight: 700;
+        color: Theme.text;
+    }
+    if App.flagged-count > 0: CountBadge {
+        x: heading.x + heading.preferred-width + 14px;
+        y: 24px;
+        text: App.flagged-text;
+    }
+    Text {
+        x: 62px;
+        y: 60px;
+        width: parent.width - 62px - 28px;
+        height: 40px;
+        text: "Tap a song to look it up online and fill in its tags, cover and lyrics. You see everything before anything is saved.";
+        font-size: 13px;
+        color: Theme.text-2;
+        wrap: word-wrap;
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for t[i] in App.flagged: FlaggedItem {
+            track: t;
+            open => { App.open-flagged(i); }
+        }
+    }
+    if App.flagged.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 200px;
+        icon: Icons.check;
+        title: "Every song is identified";
+        detail: "Songs with no artist, a title that is only a file name, or no cover show up here.";
+    }
+}
+
+// -- settings -----------------------------------------------------------------------------------
+
+component SettingsCard inherits Rectangle {
+    in property <string> heading;
+    border-radius: 16px * Theme.rounding;
+    background: Theme.neu > 0 ? transparent : Theme.surface;
+    border-width: Theme.border-w;
+    border-color: Theme.line;
+    Soft {
+        width: parent.width;
+        height: parent.height;
+        radius: 16px * Theme.rounding;
+        fill: Theme.surface;
+    }
+    Bevel {
+        width: parent.width;
+        height: parent.height;
+    }
+    VerticalLayout {
+        padding: 6px;
+        padding-top: 14px;
+        spacing: 0px;
+        HorizontalLayout {
+            padding-left: 12px;
+            height: 26px;
+            Text {
+                text: root.heading;
+                font-size: 13px;
+                font-weight: 700;
+                color: Theme.text-3;
+                vertical-alignment: center;
+            }
+        }
+        @children
+    }
+}
+
+component SettingsRow inherits Rectangle {
+    in property <string> label;
+    in property <string> detail;
+    height: 58px;
+    Text {
+        x: 14px;
+        y: root.detail != "" ? 10px : (parent.height - self.height) / 2;
+        width: parent.width * 0.5 - 14px;
+        text: root.label;
+        font-size: 15px;
+        font-weight: 500;
+        color: Theme.text;
+        overflow: elide;
+    }
+    if root.detail != "": Text {
+        x: 14px;
+        y: 31px;
+        width: parent.width * 0.5 - 14px;
+        text: root.detail;
+        font-size: 12px;
+        color: Theme.text-3;
+        overflow: elide;
+    }
+    // Controls are right-aligned; each one centres itself with `y: (parent.height - self.height) / 2`.
+    HorizontalLayout {
+        x: parent.width * 0.5;
+        y: 0px;
+        width: parent.width * 0.5 - 14px;
+        height: parent.height;
+        alignment: end;
+        spacing: 8px;
+        @children
+    }
+}
+
+component Divider inherits Rectangle {
+    height: 1px;
+    background: Theme.line;
+}
+
+component Swatch inherits Rectangle {
+    in property <color> c;
+    in property <bool> selected;
+    in property <string> label;
+    callback clicked();
+    width: 26px;
+    height: 26px;
+    border-radius: 13px * Theme.circle;
+    background: root.c;
+    border-width: root.selected ? 3px : 1px;
+    border-color: root.selected ? Theme.text : Theme.line;
+    animate border-width { duration: 100ms; }
+    TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: radio-button;
+        accessible-label: root.label;
+        accessible-checkable: true;
+        accessible-checked: root.selected;
+        accessible-action-default => { root.clicked(); }
+        clicked => { root.clicked(); }
+    }
+}
+
+/// One theme as a miniature of the interface, with its name.
+component ThemeTile inherits Rectangle {
+    in property <ThemeCard> t;
+    in property <bool> selected;
+    callback chosen();
+    height: 108px;
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: 84px;
+        border-radius: 12px * Theme.rounding;
+        background: root.t.bg;
+        border-width: root.selected ? 3px : 1px;
+        border-color: root.selected ? Theme.accent : Theme.line;
+        clip: true;
+        animate border-color { duration: 100ms; }
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: 36px;
+            height: parent.height;
+            background: root.t.panel;
+        }
+        Rectangle {
+            x: 48px;
+            y: 15px;
+            width: 56px;
+            height: 8px;
+            border-radius: 4px;
+            background: root.t.text;
+        }
+        Rectangle {
+            x: 48px;
+            y: 31px;
+            width: parent.width - 48px - 14px;
+            height: 22px;
+            border-radius: 5px;
+            background: root.t.card;
+        }
+        Rectangle {
+            x: 48px;
+            y: 60px;
+            width: 34px;
+            height: 14px;
+            border-radius: 7px;
+            background: root.t.accent;
+        }
+        Rectangle {
+            x: 90px;
+            y: 65px;
+            width: 40px;
+            height: 4px;
+            border-radius: 2px;
+            background: root.t.text.with-alpha(0.5);
+        }
+        if root.selected: Rectangle {
+            x: parent.width - 30px;
+            y: 8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 11px;
+            background: Theme.accent;
+            Icon {
+                d: Icons.check;
+                width: 16px;
+                height: 16px;
+                x: 3px;
+                y: 3px;
+                tint: Theme.on-accent;
+            }
+        }
+    }
+    Text {
+        x: 0px;
+        y: 88px;
+        width: parent.width;
+        height: 20px;
+        text: root.t.name;
+        font-size: 13px;
+        font-weight: root.selected ? 700 : 500;
+        color: root.selected ? Theme.text : Theme.text-2;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: radio-button;
+        accessible-label: root.t.name;
+        accessible-checkable: true;
+        accessible-checked: root.selected;
+        accessible-action-default => { root.chosen(); }
+        clicked => { root.chosen(); }
+    }
+}
+
+/// Every theme, grouped, in as many columns as fit.
+component ThemeGallery inherits Rectangle {
+    property <length> gap: 14px;
+    property <length> pad: 12px;
+    // As many columns as fit tiles of at least 150px, then the tiles share the row evenly.
+    property <int> cols: max(1, floor((self.width - 2 * root.pad + root.gap) / (150px + root.gap)));
+    property <length> tile-w: (self.width - 2 * root.pad - (root.cols - 1) * root.gap) / root.cols;
+    height: col.preferred-height;
+    col := VerticalLayout {
+        padding-left: root.pad;
+        padding-right: root.pad;
+        padding-bottom: 8px;
+        spacing: 6px;
+        for g in App.theme-groups: Rectangle {
+            height: 30px + ceil(g.themes.length / root.cols) * (108px + root.gap);
+            Text {
+                x: 0px;
+                y: 4px;
+                width: parent.width;
+                height: 22px;
+                text: g.title;
+                font-size: 12px;
+                font-weight: 700;
+                color: Theme.text-3;
+                vertical-alignment: center;
+            }
+            for t[i] in g.themes: ThemeTile {
+                x: mod(i, root.cols) * (root.tile-w + root.gap);
+                y: 30px + floor(i / root.cols) * (108px + root.gap);
+                width: root.tile-w;
+                t: t;
+                selected: t.id == App.theme-id;
+                chosen => { App.set-theme-id(t.id); }
+            }
+        }
+    }
+}
+
+export component SettingsPage inherits Rectangle {
+    Text {
+        x: 28px;
+        y: 22px;
+        text: "Settings";
+        font-family: Theme.title-font;
+        font-size: 34px;
+        font-weight: 700;
+        color: Theme.text;
+    }
+    Flickable {
+        y: 84px;
+        height: parent.height - 84px;
+        mouse-drag-pan-enabled: false;
+        VerticalLayout {
+            width: parent.width;
+            padding-left: 28px;
+            padding-right: 28px;
+            padding-bottom: 36px;
+            spacing: 18px;
+
+            SettingsCard {
+                heading: "THEME";
+                ThemeGallery { }
+            }
+
+            SettingsCard {
+                heading: "APPEARANCE";
+                SettingsRow {
+                    label: "Accent color";
+                    detail: App.accent-hint;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+                        height: 26px;
+                        y: (parent.height - self.height) / 2;
+                        Rectangle {
+                            width: 26px;
+                            height: 26px;
+                            border-radius: 13px * Theme.circle;
+                            background: @conic-gradient(#fa2d48 0deg, #f2b632 90deg, #2fc467 150deg, #2fb5c8 210deg, #4f7cff 270deg, #bf5af2 320deg, #fa2d48 360deg);
+                            border-width: App.accent-index == 0 ? 3px : 1px;
+                            border-color: App.accent-index == 0 ? Theme.text : Theme.line;
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                accessible-role: radio-button;
+                                accessible-label: "Automatic accent";
+                                clicked => { App.set-accent(0); }
+                            }
+                        }
+                        Swatch { c: #fa2d48; label: "Red"; selected: App.accent-index == 1; clicked => { App.set-accent(1); } }
+                        Swatch { c: #ff7a3d; label: "Orange"; selected: App.accent-index == 2; clicked => { App.set-accent(2); } }
+                        Swatch { c: #f2b632; label: "Yellow"; selected: App.accent-index == 3; clicked => { App.set-accent(3); } }
+                        Swatch { c: #2fc467; label: "Green"; selected: App.accent-index == 4; clicked => { App.set-accent(4); } }
+                        Swatch { c: #2fb5c8; label: "Teal"; selected: App.accent-index == 5; clicked => { App.set-accent(5); } }
+                        Swatch { c: #4f7cff; label: "Blue"; selected: App.accent-index == 6; clicked => { App.set-accent(6); } }
+                        Swatch { c: #9b5cf0; label: "Purple"; selected: App.accent-index == 7; clicked => { App.set-accent(7); } }
+                        Swatch { c: #ff5c93; label: "Pink"; selected: App.accent-index == 8; clicked => { App.set-accent(8); } }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Custom accent";
+                    detail: "A hex color such as #ff3b8d";
+                    Rectangle {
+                        width: 118px;
+                        height: 32px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 9px * Theme.rounding;
+                        background: Theme.hover;
+                        border-width: 1px;
+                        border-color: hex.has-focus ? Theme.accent : Theme.line;
+                        Text {
+                            x: 10px;
+                            y: (parent.height - self.height) / 2;
+                            text: "#RRGGBB";
+                            font-size: 14px;
+                            color: Theme.text-3;
+                            visible: hex.text == "";
+                        }
+                        hex := TextInput {
+                            x: 10px;
+                            width: parent.width - 20px;
+                            y: (parent.height - self.height) / 2;
+                            text: App.accent-custom;
+                            font-size: 14px;
+                            color: Theme.text;
+                            accessible-role: text-input;
+                            accessible-label: "Custom accent color";
+                            accepted => { App.set-accent-custom(self.text); }
+                            edited => {
+                                if (self.text.character-count == 7) {
+                                    App.set-accent-custom(self.text);
+                                }
+                            }
+                        }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Density";
+                    detail: "Row height in lists";
+                    Segmented {
+                        width: 300px;
+                        y: (parent.height - self.height) / 2;
+                        items: ["Compact", "Comfortable", "Spacious"];
+                        current: App.density-index;
+                        selected(i) => { App.set-density(i); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Interface size";
+                    detail: App.restart-needed ? "Restart Wisp to apply" : "Scales the whole interface";
+                    Segmented {
+                        width: 330px;
+                        y: (parent.height - self.height) / 2;
+                        items: ["90%", "100%", "110%", "125%", "150%"];
+                        current: App.scale-index;
+                        selected(i) => { App.set-scale(i); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Ambient backdrop";
+                    detail: App.backdrop-locked ? "Not used by the " + App.theme-name + " theme" : "Blurred album art behind the interface";
+                    Toggle {
+                        y: (parent.height - self.height) / 2;
+                        label: "Ambient backdrop";
+                        on: App.backdrop-setting;
+                        toggled(v) => { App.set-backdrop(v); }
+                    }
+                }
+            }
+
+            SettingsCard {
+                heading: "AUDIO";
+                SettingsRow {
+                    label: "Volume normalization";
+                    detail: "ReplayGain tags, when present";
+                    Segmented {
+                        width: 230px;
+                        y: (parent.height - self.height) / 2;
+                        items: ["Off", "Track", "Album"];
+                        current: App.norm-index;
+                        selected(i) => { App.set-normalization(i); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Pre-amp";
+                    detail: App.norm-index == 0 ? "Turn normalization on to use it" : "Applied on top of ReplayGain";
+                    Text {
+                        width: 64px;
+                        y: 0px;
+                        height: parent.height;
+                        text: (App.preamp >= 0 ? "+" : "") + round(App.preamp * 10) / 10 + " dB";
+                        font-size: 13px;
+                        color: Theme.text-2;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                    Slider {
+                        width: 150px;
+                        y: (parent.height - self.height) / 2;
+                        enabled: App.norm-index != 0;
+                        label: "Pre-amp";
+                        fill: Theme.accent;
+                        value: (App.preamp + 12) / 24;
+                        changed(v) => { App.set-preamp(v * 24 - 12); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Prevent clipping";
+                    detail: "Never boost a track past its own peak";
+                    Toggle {
+                        y: (parent.height - self.height) / 2;
+                        label: "Prevent clipping";
+                        on: App.prevent-clip;
+                        toggled(v) => { App.set-prevent-clip(v); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Output device";
+                    detail: App.output-info;
+                }
+                for dev in App.devices: Rectangle {
+                    height: 42px;
+                    Rectangle {
+                        x: 6px;
+                        y: 1px;
+                        width: parent.width - 12px;
+                        height: parent.height - 2px;
+                        border-radius: 9px * Theme.rounding;
+                        background: dev-ta.has-hover ? Theme.hover : transparent;
+                    }
+                    Text {
+                        x: 20px;
+                        width: parent.width - 80px;
+                        text: dev.name;
+                        font-size: 14px;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    if dev.id == App.device-id: Icon {
+                        d: Icons.check;
+                        width: 20px;
+                        height: 20px;
+                        x: parent.width - 40px;
+                        y: (parent.height - self.height) / 2;
+                        tint: Theme.accent;
+                    }
+                    dev-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        accessible-role: radio-button;
+                        accessible-label: dev.name;
+                        accessible-action-default => { App.set-device(dev.id); }
+                        clicked => { App.set-device(dev.id); }
+                    }
+                }
+                Rectangle {
+                    height: 8px;
+                }
+            }
+
+            SettingsCard {
+                heading: "LIBRARY";
+                SettingsRow {
+                    label: "Music folders";
+                    detail: App.library-info;
+                    PillButton {
+                        text: "Rescan";
+                        d: Icons.refresh;
+                        primary: false;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.rescan(); }
+                    }
+                    PillButton {
+                        text: "Add folder";
+                        d: Icons.add;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.add-folder(); }
+                    }
+                }
+                for folder[i] in App.folders: Rectangle {
+                    height: 42px;
+                    Icon {
+                        d: Icons.folder;
+                        width: 20px;
+                        height: 20px;
+                        x: 16px;
+                        y: (parent.height - self.height) / 2;
+                        tint: Theme.text-3;
+                    }
+                    Text {
+                        x: 46px;
+                        width: parent.width - 100px;
+                        text: folder;
+                        font-size: 14px;
+                        color: Theme.text-2;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    IconButton {
+                        x: parent.width - self.width - 8px;
+                        y: (parent.height - self.height) / 2;
+                        d: Icons.close;
+                        label: "Remove folder";
+                        size: 30px;
+                        glyph: 16px;
+                        tint: Theme.text-2;
+                        clicked => { App.remove-folder(i); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Scan on startup";
+                    detail: "Pick up new and changed files automatically";
+                    Toggle {
+                        y: (parent.height - self.height) / 2;
+                        label: "Scan on startup";
+                        on: App.scan-on-start;
+                        toggled(v) => { App.set-scan-on-start(v); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Unidentified tracks";
+                    detail: App.flagged-count == 0 ? "Every song has an artist, a title and a cover" : "Missing an artist, a real title or a cover";
+                    if App.flagged-count > 0: CountBadge {
+                        y: (parent.height - self.height) / 2;
+                        text: App.flagged-text;
+                    }
+                    PillButton {
+                        text: "Review";
+                        d: Icons.edit;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.show-page(7); }
+                    }
+                }
+                Divider { }
+                SettingsRow {
+                    label: "MusicBrainz contact";
+                    detail: "Your email or website, sent with lookups as MusicBrainz asks";
+                    Rectangle {
+                        width: 230px;
+                        height: 32px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 9px * Theme.rounding;
+                        background: Theme.hover;
+                        border-width: 1px;
+                        border-color: contact.has-focus ? Theme.accent : Theme.line;
+                        Text {
+                            x: 10px;
+                            y: (parent.height - self.height) / 2;
+                            text: "you@example.com";
+                            font-size: 14px;
+                            color: Theme.text-3;
+                            visible: contact.text == "";
+                        }
+                        contact := TextInput {
+                            x: 10px;
+                            width: parent.width - 20px;
+                            y: (parent.height - self.height) / 2;
+                            text: App.mb-contact;
+                            font-size: 14px;
+                            color: Theme.text;
+                            selection-background-color: Theme.accent.with-alpha(0.45);
+                            selection-foreground-color: Theme.text;
+                            single-line: true;
+                            accessible-role: text-input;
+                            accessible-label: "MusicBrainz contact";
+                            accepted => { App.set-mb-contact(self.text); }
+                            changed has-focus => {
+                                if (!self.has-focus) {
+                                    App.set-mb-contact(self.text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsCard {
+                heading: "ABOUT";
+                SettingsRow {
+                    label: "Wisp Player";
+                    detail: "Gapless audio player. Built with Rust, Slint, Symphonia, cpal, rubato and redb.";
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Made by Claude";
+                    detail: "Designed and written by Claude, an AI model by Anthropic.";
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Free software, GNU GPL v3";
+                    detail: "You may share and change it. No warranty.";
+                }
+                Divider { }
+                SettingsRow {
+                    label: "Source code";
+                    detail: "github.com/DividedsWhimsicalVHS/WispPlayer";
+                }
+                Rectangle {
+                    height: 8px;
+                }
+            }
+        }
+    }
+}

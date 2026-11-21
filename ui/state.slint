@@ -1,0 +1,212 @@
+// The whole UI state lives in one global. Rust writes the properties and handles the callbacks;
+// every component just reads `App.*`, so nothing needs to be forwarded through layers.
+
+import { TrackRow, QueueRow, AlbumData, ArtistData, LyricLine, DeviceRow, ResultRow, ThemeGroup } from "types.slint";
+
+export global App {
+    // -- navigation: 0 songs, 1 albums, 2 artists, 3 queue, 4 settings, 5 album detail,
+    //    6 playlist, 7 unidentified tracks
+    in-out property <int> page: 0;
+    in-out property <bool> np-open: false;
+    in-out property <int> np-tab: 0;
+    in-out property <string> search-text: "";
+    in-out property <string> toast: "";
+
+    // -- now playing
+    in-out property <bool> has-track: false;
+    in-out property <bool> playing: false;
+    in-out property <string> title: "";
+    in-out property <string> artist: "";
+    in-out property <string> album: "";
+    in-out property <image> art;
+    in-out property <bool> has-art: false;
+    in-out property <int> now-track: -1;
+    in-out property <int> now-uid: -1;
+    in-out property <float> progress: 0;
+    in-out property <string> pos-text: "0:00";
+    in-out property <string> dur-text: "0:00";
+    in-out property <float> volume: 0.8;
+    in-out property <bool> muted: false;
+    in-out property <bool> shuffle: false;
+    in-out property <int> repeat: 0;
+    /// Backdrop images; two slots so a track change can cross-fade.
+    in-out property <image> backdrop-a;
+    in-out property <image> backdrop-b;
+    in-out property <bool> backdrop-flip: false;
+    in-out property <bool> has-backdrop: false;
+
+    // -- lists
+    in-out property <[TrackRow]> tracks;
+    in-out property <[AlbumData]> albums;
+    in-out property <[ArtistData]> artists;
+    in-out property <[QueueRow]> queue;
+    /// The queue starting at the playing track (the "Up Next" tab).
+    in-out property <[QueueRow]> upnext;
+    /// Index in the full queue of the first `upnext` row.
+    in-out property <int> upnext-offset: 0;
+    in-out property <int> sort-index: 0;
+    in-out property <string> songs-subtitle: "";
+    in-out property <string> albums-subtitle: "";
+    in-out property <string> artists-subtitle: "";
+    in-out property <string> queue-subtitle: "";
+    in-out property <string> filter-label: "";
+    in-out property <bool> scanning: false;
+    in-out property <string> scan-text: "";
+
+    // -- album detail
+    in-out property <string> detail-title: "";
+    in-out property <string> detail-artist: "";
+    in-out property <string> detail-meta: "";
+    in-out property <image> detail-art;
+    in-out property <bool> detail-has-art: false;
+    in-out property <int> detail-seed: 0;
+
+    // -- lyrics
+    in-out property <[LyricLine]> lyrics;
+    in-out property <int> lyrics-active: -1;
+    in-out property <bool> lyrics-synced: false;
+    in-out property <bool> lyrics-loading: false;
+
+    // -- settings
+    in-out property <[ThemeGroup]> theme-groups;
+    in-out property <string> theme-id: "";
+    in-out property <string> theme-name: "";
+    /// The current theme does not show the album-art backdrop (it is flat or has its own backdrop).
+    in-out property <bool> backdrop-locked: false;
+    in-out property <string> accent-hint: "";
+    in-out property <int> accent-index: 0;
+    in-out property <string> accent-custom: "";
+    in-out property <int> density-index: 1;
+    in-out property <int> scale-index: 2;
+    in-out property <bool> backdrop-setting: true;
+    in-out property <int> norm-index: 0;
+    in-out property <float> preamp: 0;
+    in-out property <bool> prevent-clip: true;
+    in-out property <[DeviceRow]> devices;
+    in-out property <string> device-id: "";
+    in-out property <string> output-info: "";
+    in-out property <[string]> folders;
+    in-out property <bool> scan-on-start: true;
+    in-out property <string> library-info: "";
+    in-out property <bool> restart-needed: false;
+
+    // -- playlists
+    in-out property <[string]> playlists;
+    /// The playlist open on page 6 (an index into `playlists`).
+    in-out property <int> playlist-index: -1;
+    in-out property <string> playlist-title: "";
+    in-out property <string> playlist-subtitle: "";
+    /// The "Add to playlist" menu, shown next to the button that opened it.
+    in-out property <bool> menu-open: false;
+    in-out property <length> menu-x: 0px;
+    in-out property <length> menu-y: 0px;
+    /// Modal dialog: 0 none, 1 new playlist, 2 rename playlist, 3 delete playlist,
+    /// 4 save the queue as a playlist.
+    in-out property <int> dialog: 0;
+    in-out property <string> dialog-text: "";
+    in-out property <string> dialog-error: "";
+
+    // -- unidentified tracks (page 7)
+    /// The songs whose tags leave out an artist, a real title or a cover.
+    in-out property <[TrackRow]> flagged;
+    /// "14 Unidentified", or "" when there are none.
+    in-out property <string> flagged-text: "";
+    in-out property <int> flagged-count: 0;
+    /// Sent with every lookup, as MusicBrainz asks of the programs that use it.
+    in-out property <string> mb-contact: "";
+
+    // -- the track editor (a modal over everything)
+    in-out property <bool> ed-open: false;
+    in-out property <string> ed-file: "";
+    in-out property <string> ed-reason: "";
+    /// What saving does for this kind of file.
+    in-out property <string> ed-where: "";
+    in-out property <string> ed-query: "";
+    in-out property <string> ed-status: "";
+    in-out property <bool> ed-problem: false;
+    in-out property <bool> ed-busy: false;
+    in-out property <[ResultRow]> ed-results;
+    in-out property <int> ed-picked: -1;
+    in-out property <string> ed-title: "";
+    in-out property <string> ed-artist: "";
+    in-out property <string> ed-album: "";
+    in-out property <string> ed-album-artist: "";
+    in-out property <string> ed-year: "";
+    in-out property <string> ed-track: "";
+    in-out property <image> ed-cover;
+    in-out property <bool> ed-has-cover: false;
+    in-out property <bool> ed-cover-busy: false;
+    in-out property <string> ed-cover-note: "";
+    in-out property <string> ed-lyrics: "";
+    /// Counts the times the text was replaced from outside (so the box scrolls back to the top).
+    in-out property <int> ed-lyrics-serial: 0;
+    in-out property <string> ed-lyrics-note: "";
+    /// Which versions of the picked song's lyrics exist: 0 none, 1 plain, 2 synced, 3 both.
+    in-out property <int> ed-lyrics-avail: 0;
+    /// The version shown in the box: 0 synced, 1 plain.
+    in-out property <int> ed-lyrics-mode: 0;
+    in-out property <bool> ed-saving: false;
+    in-out property <string> ed-error: "";
+
+    // -- callbacks (implemented in Rust)
+    callback play-row(int);
+    callback play-next-row(int);
+    callback enqueue-row(int);
+    callback play-all(bool);
+    callback toggle-play();
+    callback next();
+    callback prev();
+    callback seek(float);
+    callback seek-by(int);
+    callback volume-by(float);
+    callback volume-changed(float);
+    callback volume-committed(float);
+    callback toggle-mute();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    callback show-page(int);
+    callback search(string);
+    callback sort-changed(int);
+    callback open-album(int);
+    callback play-album(int, bool);
+    callback open-artist(int);
+    callback clear-filter();
+    callback queue-play(int);
+    callback queue-remove(int);
+    callback queue-clear();
+    callback lyrics-seek(int);
+    callback add-folder();
+    callback remove-folder(int);
+    callback rescan();
+    callback set-theme-id(string);
+    callback set-accent(int);
+    callback set-accent-custom(string);
+    callback set-density(int);
+    callback set-scale(int);
+    callback set-backdrop(bool);
+    callback set-normalization(int);
+    callback set-preamp(float);
+    callback set-prevent-clip(bool);
+    callback set-device(string);
+    callback set-scan-on-start(bool);
+    callback restart-app();
+    callback focus-search();
+    callback open-playlist(int);
+    /// A song row asked for the playlist menu: (row, x, y).
+    callback playlist-menu(int, length, length);
+    /// Adds the song(s) the menu was opened for; -1 = to a new playlist.
+    callback add-to-playlist(int);
+    callback playlist-remove-row(int);
+    callback open-dialog(int);
+    callback dialog-accept(string);
+    callback set-mb-contact(string);
+    /// A row of the unidentified list was chosen: open it in the editor.
+    callback open-flagged(int);
+    callback ed-search(string);
+    /// A search result was chosen: fill the editor from it.
+    callback ed-pick(int);
+    callback ed-lyrics-mode-picked(int);
+    callback ed-choose-cover();
+    callback ed-save();
+    callback ed-close();
+}

@@ -1,0 +1,243 @@
+import { Theme, Icons } from "theme.slint";
+import { Icon, IconButton, Slider, Cover, Soft, Bevel, Gloss } from "widgets.slint";
+import { App } from "state.slint";
+
+/// The transport bar: a floating rounded card at the bottom of the window.
+export component PlayerBar inherits Rectangle {
+    height: 88px;
+
+    card := Rectangle {
+        x: 12px;
+        y: 6px;
+        width: parent.width - 24px;
+        height: parent.height - 14px;
+        border-radius: 20px * Theme.rounding;
+        background: Theme.neu > 0 ? transparent : Theme.bar;
+        border-width: Theme.border-w;
+        border-color: Theme.line;
+        drop-shadow-blur: 28px;
+        drop-shadow-color: Theme.shadow;
+        drop-shadow-offset-y: 6px;
+
+        property <length> side: min(310px, self.width * 0.28);
+
+        Soft {
+            width: parent.width;
+            height: parent.height;
+            radius: 20px * Theme.rounding;
+            fill: Theme.bar;
+        }
+        Bevel {
+            width: parent.width;
+            height: parent.height;
+        }
+
+        // -- left: what is playing
+        Rectangle {
+            x: 0px;
+            width: card.side;
+            height: parent.height;
+            Cover {
+                x: 12px;
+                y: (parent.height - self.height) / 2;
+                width: 54px;
+                height: 54px;
+                art: App.art;
+                has-art: App.has-art;
+                seed: App.has-track ? App.now-track : -1;
+                radius: 9px * Theme.rounding;
+            }
+            VerticalLayout {
+                x: 76px;
+                width: parent.width - 84px;
+                alignment: center;
+                spacing: 2px;
+                Text {
+                    text: App.has-track ? App.title : "Nothing playing";
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: App.has-track ? Theme.text : Theme.text-2;
+                    overflow: elide;
+                }
+                Text {
+                    text: App.artist;
+                    font-size: 13px;
+                    color: Theme.text-2;
+                    overflow: elide;
+                }
+            }
+            TouchArea {
+                enabled: App.has-track;
+                mouse-cursor: pointer;
+                accessible-role: button;
+                accessible-label: "Open now playing";
+                accessible-action-default => { App.np-open = !App.np-open; }
+                clicked => { App.np-open = !App.np-open; }
+            }
+        }
+
+        // -- center: transport + seek
+        Rectangle {
+            x: card.side;
+            width: parent.width - 2 * card.side;
+            height: parent.height;
+            VerticalLayout {
+                x: (parent.width - self.width) / 2;
+                width: min(parent.width - 16px, 640px);
+                padding-top: 8px;
+                spacing: 2px;
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    height: 44px;
+                    IconButton {
+                        d: Icons.shuffle;
+                        label: "Shuffle";
+                        active: App.shuffle;
+                        tint: Theme.text-2;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.toggle-shuffle(); }
+                    }
+                    IconButton {
+                        d: Icons.prev;
+                        label: "Previous";
+                        glyph: 24px;
+                        enabled: App.has-track;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.prev(); }
+                    }
+                    Rectangle {
+                        width: 44px;
+                        height: 44px;
+                        border-radius: 22px * Theme.circle;
+                        background: pp.pressed ? Theme.accent.darker(0.15) : pp.has-hover ? Theme.accent.brighter(0.08) : Theme.accent;
+                        opacity: App.has-track ? 1 : 0.5;
+                        drop-shadow-blur: 18px * Theme.glow;
+                        drop-shadow-color: Theme.accent.with-alpha(0.7 * Theme.glow);
+                        animate background { duration: 120ms; }
+                        Gloss {
+                            width: parent.width - 6px;
+                            height: parent.height * 0.48;
+                            x: 3px;
+                            y: 2px;
+                            radius: 22px * Theme.circle;
+                        }
+                        Icon {
+                            d: App.playing ? Icons.pause : Icons.play;
+                            width: 26px;
+                            height: 26px;
+                            x: (parent.width - self.width) / 2 + (App.playing ? 0px : 1px);
+                            y: (parent.height - self.height) / 2;
+                            tint: Theme.on-accent;
+                        }
+                        pp := TouchArea {
+                            mouse-cursor: pointer;
+                            accessible-role: button;
+                            accessible-label: App.playing ? "Pause" : "Play";
+                            accessible-action-default => { App.toggle-play(); }
+                            clicked => { App.toggle-play(); }
+                        }
+                    }
+                    IconButton {
+                        d: Icons.next;
+                        label: "Next";
+                        glyph: 24px;
+                        enabled: App.has-track;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.next(); }
+                    }
+                    IconButton {
+                        d: App.repeat == 2 ? Icons.repeat-one : Icons.repeat;
+                        label: "Repeat";
+                        active: App.repeat > 0;
+                        tint: Theme.text-2;
+                        y: (parent.height - self.height) / 2;
+                        clicked => { App.cycle-repeat(); }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    height: 20px;
+                    Text {
+                        width: 44px;
+                        text: App.pos-text;
+                        font-size: 12px;
+                        color: Theme.text-2;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                    Slider {
+                        value: App.progress;
+                        enabled: App.has-track;
+                        label: "Seek";
+                        committed(v) => { App.seek(v); }
+                    }
+                    Text {
+                        width: 44px;
+                        text: App.dur-text;
+                        font-size: 12px;
+                        color: Theme.text-2;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // -- right: volume and panels
+        Rectangle {
+            x: parent.width - card.side;
+            width: card.side;
+            height: parent.height;
+            HorizontalLayout {
+                padding-right: 14px;
+                spacing: 4px;
+                alignment: end;
+                IconButton {
+                    d: Icons.lyrics;
+                    label: "Lyrics";
+                    active: App.np-open && App.np-tab == 0;
+                    tint: Theme.text-2;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        if (App.np-open && App.np-tab == 0) {
+                            App.np-open = false;
+                        } else {
+                            App.np-tab = 0;
+                            App.np-open = true;
+                        }
+                    }
+                }
+                IconButton {
+                    d: Icons.queue;
+                    label: "Queue";
+                    active: App.np-open && App.np-tab == 1;
+                    tint: Theme.text-2;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        if (App.np-open && App.np-tab == 1) {
+                            App.np-open = false;
+                        } else {
+                            App.np-tab = 1;
+                            App.np-open = true;
+                        }
+                    }
+                }
+                IconButton {
+                    d: App.muted || App.volume < 0.005 ? Icons.volume-off : App.volume < 0.45 ? Icons.volume-low : Icons.volume-high;
+                    label: App.muted ? "Unmute" : "Mute";
+                    tint: Theme.text-2;
+                    y: (parent.height - self.height) / 2;
+                    clicked => { App.toggle-mute(); }
+                }
+                if card.width > 1000px: Slider {
+                    width: 92px;
+                    value: App.muted ? 0 : App.volume;
+                    label: "Volume";
+                    y: (parent.height - self.height) / 2;
+                    changed(v) => { App.volume-changed(v); }
+                    committed(v) => { App.volume-committed(v); }
+                }
+            }
+        }
+    }
+}

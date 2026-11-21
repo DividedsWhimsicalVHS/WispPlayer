@@ -1,0 +1,625 @@
+import { Theme, Icons } from "theme.slint";
+import { Icon, IconButton, PillButton, Segmented, SearchField, ListView, Cover } from "widgets.slint";
+import { QueueItem } from "rows.slint";
+import { LyricsView } from "lyrics.slint";
+import { PlayerBar } from "bar.slint";
+import { SongsPage, AlbumsPage, ArtistsPage, QueuePage, AlbumDetailPage, SettingsPage, PlaylistPage, UnidentifiedPage } from "pages.slint";
+import { TagEditor } from "editor.slint";
+import { App } from "state.slint";
+
+export { App } from "state.slint";
+export { Theme } from "theme.slint";
+export { TrackRow, QueueRow, AlbumData, ArtistData, LyricLine, DeviceRow, ResultRow, ThemeCard, ThemeGroup } from "types.slint";
+
+component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <string> d;
+    in property <bool> active;
+    callback clicked();
+    height: 38px;
+    border-radius: 10px * Theme.rounding;
+    background: root.active ? Theme.accent.with-alpha(0.16) : ta.pressed ? Theme.press : ta.has-hover ? Theme.hover : transparent;
+    animate background { duration: 100ms; }
+    Icon {
+        d: root.d;
+        width: 22px;
+        height: 22px;
+        x: 12px;
+        y: (parent.height - self.height) / 2;
+        tint: root.active ? Theme.accent : Theme.text-2;
+    }
+    Text {
+        x: 46px;
+        width: parent.width - 56px;
+        text: root.label;
+        font-size: 15px;
+        font-weight: root.active ? 600 : 500;
+        color: root.active ? Theme.text : Theme.text-2;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: root.label;
+        accessible-action-default => { root.clicked(); }
+        clicked => { root.clicked(); }
+    }
+}
+
+component MenuItem inherits Rectangle {
+    in property <string> text;
+    in property <string> d;
+    callback clicked();
+    height: 36px;
+    border-radius: 8px * Theme.rounding;
+    background: ta.pressed ? Theme.press : ta.has-hover ? Theme.hover : transparent;
+    Icon {
+        d: root.d;
+        width: 18px;
+        height: 18px;
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+    }
+    Text {
+        x: 38px;
+        width: parent.width - 46px;
+        text: root.text;
+        font-size: 14px;
+        color: Theme.text;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: root.text;
+        accessible-action-default => { root.clicked(); }
+        clicked => { root.clicked(); }
+    }
+}
+
+/// "Add to playlist": every playlist, plus a new one.
+component PlaylistMenu inherits Rectangle {
+    property <length> menu-h: min(330px, 54px + 36px * App.playlists.length);
+    TouchArea {
+        clicked => { App.menu-open = false; }
+    }
+    Rectangle {
+        width: 250px;
+        height: root.menu-h;
+        x: max(8px, min(App.menu-x + 32px - self.width, root.width - self.width - 8px));
+        y: App.menu-y + self.height > root.height - 8px ? max(8px, App.menu-y - self.height - 36px) : App.menu-y;
+        border-radius: 12px * Theme.rounding;
+        background: Theme.overlay;
+        border-width: Theme.border-w;
+        border-color: Theme.line;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: Theme.shadow;
+        drop-shadow-offset-y: 6px;
+        TouchArea { }
+        MenuItem {
+            x: 4px;
+            y: 4px;
+            width: parent.width - 8px;
+            text: "New playlist…";
+            d: Icons.add;
+            clicked => { App.add-to-playlist(-1); }
+        }
+        if App.playlists.length > 0: Rectangle {
+            x: 10px;
+            y: 44px;
+            width: parent.width - 20px;
+            height: 1px;
+            background: Theme.line;
+        }
+        ListView {
+            x: 4px;
+            y: 49px;
+            width: parent.width - 8px;
+            height: parent.height - 53px;
+            for name[i] in App.playlists: MenuItem {
+                text: name;
+                d: Icons.playlist;
+                clicked => { App.add-to-playlist(i); }
+            }
+        }
+    }
+}
+
+/// New / rename / delete playlist, and saving the queue as one.
+component Dialog inherits Rectangle {
+    background: #00000070;
+    TouchArea {
+        clicked => { App.dialog = 0; }
+    }
+    Rectangle {
+        width: 400px;
+        height: layout.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 - 30px;
+        border-radius: 16px * Theme.rounding;
+        background: Theme.overlay;
+        border-width: Theme.border-w;
+        border-color: Theme.line;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: Theme.shadow;
+        TouchArea { }
+        layout := VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            Text {
+                text: App.dialog == 1 ? "New playlist" : App.dialog == 2 ? "Rename playlist" : App.dialog == 3 ? "Delete playlist?" : "Save queue as playlist";
+                font-size: 19px;
+                font-weight: 700;
+                color: Theme.text;
+            }
+            if App.dialog == 3: Text {
+                text: "\"" + App.playlist-title + "\" will be deleted. The songs stay in your library.";
+                font-size: 14px;
+                color: Theme.text-2;
+                wrap: word-wrap;
+            }
+            if App.dialog != 3: Rectangle {
+                height: 38px;
+                border-radius: 10px * Theme.rounding;
+                background: Theme.hover;
+                border-width: Theme.border-w;
+                border-color: name.has-focus ? Theme.accent : Theme.line;
+                Text {
+                    x: 12px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Playlist name";
+                    font-size: 14px;
+                    color: Theme.text-3;
+                    visible: name.text == "";
+                }
+                name := TextInput {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    y: (parent.height - self.height) / 2;
+                    text <=> App.dialog-text;
+                    font-size: 15px;
+                    color: Theme.text;
+                    selection-background-color: Theme.accent.with-alpha(0.45);
+                    selection-foreground-color: Theme.text;
+                    single-line: true;
+                    accessible-role: text-input;
+                    accessible-label: "Playlist name";
+                    init => { self.focus(); self.select-all(); }
+                    accepted => { App.dialog-accept(self.text); }
+                }
+            }
+            if App.dialog-error != "": Text {
+                text: App.dialog-error;
+                font-size: 13px;
+                color: Theme.danger;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 10px;
+                PillButton {
+                    text: "Cancel";
+                    primary: false;
+                    clicked => { App.dialog = 0; }
+                }
+                PillButton {
+                    text: App.dialog == 1 ? "Create" : App.dialog == 2 ? "Rename" : App.dialog == 3 ? "Delete" : "Save";
+                    clicked => { App.dialog-accept(App.dialog-text); }
+                }
+            }
+        }
+    }
+}
+
+component Sidebar inherits Rectangle {
+    background: Theme.sidebar;
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        background: Theme.line;
+    }
+    // brand
+    Rectangle {
+        x: 20px;
+        y: 20px;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px * Theme.rounding;
+        background: @linear-gradient(135deg, Theme.accent 0%, Theme.accent.darker(0.45) 100%);
+        Icon {
+            d: Icons.note;
+            width: 18px;
+            height: 18px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: #ffffff;
+        }
+    }
+    Text {
+        x: 60px;
+        y: 20px;
+        height: 30px;
+        text: "Wisp";
+        font-family: Theme.title-font;
+        font-size: 21px;
+        font-weight: 700;
+        color: Theme.text;
+        vertical-alignment: center;
+    }
+    search := SearchField {
+        x: 14px;
+        y: 68px;
+        width: parent.width - 28px;
+        text: App.search-text;
+        placeholder: "Search";
+        edited(t) => { App.search(t); }
+    }
+    VerticalLayout {
+        x: 12px;
+        y: 120px;
+        width: parent.width - 24px;
+        spacing: 3px;
+        NavItem {
+            label: "Songs";
+            d: Icons.songs;
+            active: App.page == 0;
+            clicked => { App.show-page(0); }
+        }
+        NavItem {
+            label: "Albums";
+            d: Icons.album;
+            active: App.page == 1 || App.page == 5;
+            clicked => { App.show-page(1); }
+        }
+        NavItem {
+            label: "Artists";
+            d: Icons.person;
+            active: App.page == 2;
+            clicked => { App.show-page(2); }
+        }
+        NavItem {
+            label: "Queue";
+            d: Icons.queue;
+            active: App.page == 3;
+            clicked => { App.show-page(3); }
+        }
+    }
+    Text {
+        x: 26px;
+        y: 296px;
+        height: 30px;
+        text: "PLAYLISTS";
+        font-size: 12px;
+        font-weight: 700;
+        color: Theme.text-3;
+        vertical-alignment: center;
+    }
+    IconButton {
+        x: parent.width - self.width - 14px;
+        y: 296px;
+        d: Icons.add;
+        label: "New playlist";
+        size: 30px;
+        glyph: 18px;
+        tint: Theme.text-2;
+        clicked => { App.open-dialog(1); }
+    }
+    ListView {
+        x: 12px;
+        y: 330px;
+        width: parent.width - 24px;
+        height: max(0px, parent.height - 330px - 60px - (App.scanning ? 26px : 0px));
+        for name[i] in App.playlists: NavItem {
+            label: name;
+            d: Icons.playlist;
+            active: App.page == 6 && App.playlist-index == i;
+            clicked => { App.open-playlist(i); }
+        }
+    }
+    VerticalLayout {
+        x: 12px;
+        y: parent.height - 50px - (App.scanning ? 26px : 0px);
+        width: parent.width - 24px;
+        spacing: 3px;
+        if App.scanning: Text {
+            height: 24px;
+            text: App.scan-text;
+            font-size: 12px;
+            color: Theme.text-3;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        NavItem {
+            label: "Settings";
+            d: Icons.settings;
+            active: App.page == 4 || App.page == 7;
+            clicked => { App.show-page(4); }
+        }
+    }
+    public function focus-search() {
+        search.focus-field();
+    }
+}
+
+component NowPlaying inherits Rectangle {
+    property <length> cs: max(180px, min(root.height - 250px, root.width * 0.38));
+
+    IconButton {
+        x: 16px;
+        y: 14px;
+        d: Icons.chevron-down;
+        label: "Close now playing";
+        size: 40px;
+        glyph: 26px;
+        clicked => { App.np-open = false; }
+    }
+    // left: artwork and titles
+    Cover {
+        x: root.width * 0.07;
+        y: (root.height - root.cs - 110px) / 2 + (App.np-open ? 0px : 22px);
+        width: root.cs;
+        height: root.cs;
+        art: App.art;
+        has-art: App.has-art;
+        seed: App.now-track;
+        radius: 18px * Theme.rounding;
+        shadow: true;
+        animate y { duration: 360ms; easing: ease-out; }
+    }
+    VerticalLayout {
+        x: root.width * 0.07;
+        y: (root.height - root.cs - 110px) / 2 + root.cs + 22px + (App.np-open ? 0px : 22px);
+        width: root.cs;
+        spacing: 3px;
+        alignment: start;
+        animate y { duration: 360ms; easing: ease-out; }
+        Text {
+            text: App.title;
+            font-family: Theme.title-font;
+            font-size: 26px;
+            font-weight: 700;
+            color: Theme.text;
+            overflow: elide;
+        }
+        Text {
+            text: App.artist;
+            font-size: 18px;
+            font-weight: 600;
+            color: Theme.accent-text;
+            overflow: elide;
+        }
+        Text {
+            text: App.album;
+            font-size: 14px;
+            color: Theme.text-2;
+            overflow: elide;
+        }
+    }
+    // right: lyrics or up next
+    Segmented {
+        x: root.width * 0.52;
+        y: 22px;
+        width: 220px;
+        items: ["Lyrics", "Up Next"];
+        current: App.np-tab;
+        selected(i) => { App.np-tab = i; }
+    }
+    LyricsView {
+        x: root.width * 0.52;
+        y: 70px;
+        width: root.width * 0.44;
+        height: root.height - 86px;
+        visible: App.np-tab == 0;
+    }
+    ListView {
+        x: root.width * 0.5;
+        y: 70px;
+        width: root.width * 0.48;
+        height: root.height - 86px;
+        visible: App.np-tab == 1;
+        for q[i] in App.upnext: QueueItem {
+            entry: q;
+            current: q.uid == App.now-uid;
+            playing: App.playing;
+            // `upnext` starts at the playing track; queue actions address the full queue.
+            play => { App.queue-play(App.upnext-offset + i); }
+            remove => { App.queue-remove(App.upnext-offset + i); }
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Wisp";
+    icon: @image-url("../assets/icon/wisp-128.png");
+    preferred-width: 1180px;
+    preferred-height: 760px;
+    min-width: 840px;
+    min-height: 560px;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+    default-font-weight: Theme.weight;
+    forward-focus: keys;
+
+    public function focus-search() {
+        sidebar.focus-search();
+    }
+
+    // A modal's text box takes the keyboard focus with it when it closes; without this the player
+    // shortcuts (space, arrows, M) would stay dead until the next click.
+    private property <bool> modal-open: App.ed-open || App.dialog != 0 || App.menu-open;
+    changed modal-open => {
+        if (!self.modal-open) {
+            keys.focus();
+        }
+    }
+
+    keys := FocusScope {
+        width: parent.width;
+        height: parent.height;
+        key-pressed(e) => {
+            if (App.ed-open) {
+                // The editor is modal: only Escape reaches past it, no player shortcuts.
+                if (e.text == Key.Escape) {
+                    App.ed-close();
+                    return accept;
+                }
+                return reject;
+            }
+            if (e.modifiers.control && e.text == "f") {
+                sidebar.focus-search();
+                return accept;
+            }
+            if (e.text == " ") {
+                App.toggle-play();
+                return accept;
+            }
+            if (e.text == Key.Escape) {
+                if (App.dialog != 0) {
+                    App.dialog = 0;
+                } else if (App.menu-open) {
+                    App.menu-open = false;
+                } else if (App.np-open) {
+                    App.np-open = false;
+                } else if (App.search-text != "") {
+                    App.search("");
+                }
+                return accept;
+            }
+            if (e.text == Key.LeftArrow) {
+                App.seek-by(-5);
+                return accept;
+            }
+            if (e.text == Key.RightArrow) {
+                App.seek-by(5);
+                return accept;
+            }
+            if (e.text == Key.UpArrow) {
+                App.volume-by(0.05);
+                return accept;
+            }
+            if (e.text == Key.DownArrow) {
+                App.volume-by(-0.05);
+                return accept;
+            }
+            if (e.text == "m") {
+                App.toggle-mute();
+                return accept;
+            }
+            reject
+        }
+
+        // Ambient backdrop: the blurred cover, cross-faded between two slots.
+        if Theme.bg-gradient: Rectangle {
+            background: @linear-gradient(180deg, Theme.bg 0%, Theme.bg2 100%);
+        }
+        Rectangle {
+            background: @linear-gradient(160deg, Theme.accent.with-alpha(0.20 * Theme.wash) 0%, transparent 65%);
+        }
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: App.backdrop-a;
+            image-fit: fill;
+            opacity: Theme.backdrop-on && App.has-backdrop && !App.backdrop-flip ? 1 : 0;
+            animate opacity { duration: 800ms; easing: ease-in-out; }
+        }
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: App.backdrop-b;
+            image-fit: fill;
+            opacity: Theme.backdrop-on && App.has-backdrop && App.backdrop-flip ? 1 : 0;
+            animate opacity { duration: 800ms; easing: ease-in-out; }
+        }
+        Rectangle {
+            background: Theme.scrim;
+        }
+        Rectangle {
+            background: Theme.tint;
+        }
+
+        // Browsing UI.
+        browse := Rectangle {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height - 88px;
+            opacity: App.np-open ? 0 : 1;
+            visible: self.opacity > 0.005;
+            animate opacity { duration: 240ms; easing: ease-out; }
+
+            sidebar := Sidebar {
+                x: 0px;
+                width: 232px;
+                height: parent.height;
+            }
+            Rectangle {
+                x: 232px;
+                width: parent.width - 232px;
+                height: parent.height;
+                clip: true;
+                if App.page == 0: SongsPage { }
+                if App.page == 1: AlbumsPage { }
+                if App.page == 2: ArtistsPage { }
+                if App.page == 3: QueuePage { }
+                if App.page == 4: SettingsPage { }
+                if App.page == 5: AlbumDetailPage { }
+                if App.page == 6: PlaylistPage { }
+                if App.page == 7: UnidentifiedPage { }
+            }
+        }
+
+        // Full-screen now playing.
+        NowPlaying {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height - 88px;
+            opacity: App.np-open ? 1 : 0;
+            visible: self.opacity > 0.005;
+            animate opacity { duration: 280ms; easing: ease-out; }
+        }
+
+        PlayerBar {
+            y: parent.height - self.height;
+            width: parent.width;
+        }
+
+        if App.menu-open: PlaylistMenu {
+            width: parent.width;
+            height: parent.height;
+        }
+        if App.dialog != 0: Dialog {
+            width: parent.width;
+            height: parent.height;
+        }
+        if App.ed-open: TagEditor {
+            width: parent.width;
+            height: parent.height;
+        }
+
+        // Transient message (errors, "added to queue").
+        if App.toast != "": Rectangle {
+            width: toast-text.preferred-width + 36px;
+            height: 38px;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - 88px - 52px;
+            border-radius: 19px * Theme.rounding;
+            background: Theme.overlay;
+            border-width: Theme.border-w;
+            border-color: Theme.line;
+            drop-shadow-blur: 18px;
+            drop-shadow-color: Theme.shadow;
+            drop-shadow-offset-y: 4px;
+            toast-text := Text {
+                text: App.toast;
+                font-size: 14px;
+                color: Theme.text;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

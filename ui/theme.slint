@@ -1,0 +1,103 @@
+// Design tokens. Everything visual that is not layout comes from here. The values are written by
+// the theme engine (src/themes.rs) whenever the theme, the accent or the artwork changes, so a
+// theme restyles the whole app by changing these properties and nothing else. The defaults below
+// are the Wisp dark theme, so a window shown before a theme was applied still looks right.
+
+export global Theme {
+    // -- settings
+    /// 0 = compact, 1 = comfortable, 2 = spacious
+    in-out property <int> density: 1;
+    in-out property <bool> backdrop-on: true;
+
+    // -- palette
+    in-out property <color> accent: #fa2d48;
+    /// Second accent: the end of gradient seek bars (equal to `accent` when there is none).
+    in-out property <color> accent2: #fa2d48;
+    in-out property <color> on-accent: #ffffff;
+    /// The accent as the color of small text (the playing track, an artist's name): the accent
+    /// itself when it reads well on the surfaces, else nudged toward the text color.
+    in-out property <color> accent-text: #fa2d48;
+    in-out property <color> bg: #0a0a0e;
+    in-out property <color> bg2: #0a0a0e;
+    in-out property <bool> bg-gradient: false;
+    in-out property <color> sidebar: #00000046;
+    in-out property <color> surface: #ffffff12;
+    in-out property <color> surface-hi: #ffffff20;
+    in-out property <color> bar: #1b1b22ea;
+    in-out property <color> overlay: #26262ef5;
+    in-out property <color> scrim: #0a0a0ebf;
+    in-out property <color> text: #ffffff;
+    in-out property <color> text-2: #ffffffb2;
+    in-out property <color> text-3: #ffffff68;
+    in-out property <color> line: #ffffff1a;
+    in-out property <color> hover: #ffffff14;
+    in-out property <color> press: #ffffff24;
+    in-out property <color> track: #ffffff2e;
+    in-out property <color> thumb: #ffffff66;
+    in-out property <color> seg: #ffffff2e;
+    in-out property <color> knob: #ffffff;
+    in-out property <color> shadow: #00000066;
+    in-out property <color> danger: #ff5c6c;
+    in-out property <color> tint: #00000000;
+
+    // -- style traits
+    /// Corner rounding of cards, rows, buttons and inputs (1 = the default look).
+    in-out property <float> rounding: 1;
+    /// Roundness of play button, icon buttons, toggles and thumbs (1 = circle, 0 = square).
+    in-out property <float> circle: 1;
+    in-out property <length> border-w: 1px;
+    in-out property <string> font: "";
+    in-out property <string> title-font: "";
+    in-out property <int> weight: 400;
+    in-out property <float> glow: 0;
+    in-out property <float> gloss: 0;
+    in-out property <bool> bevel: false;
+    in-out property <color> bevel-light: #ffffff;
+    in-out property <color> bevel-dark: #808080;
+    in-out property <float> neu: 0;
+    in-out property <color> neu-light: #ffffff;
+    in-out property <color> neu-dark: #a3b1c6;
+    in-out property <float> wash: 1;
+    in-out property <float> hit: 1;
+    /// Seek/volume bar: 0 text color, 1 accent, 2 gradient from accent to accent2.
+    in-out property <int> bar-style: 0;
+
+    out property <length> row-h: density == 0 ? 40px : density == 1 ? 52px : 64px;
+    out property <length> cover-radius: 10px * rounding;
+}
+
+/// Icon outlines (Material Design icons, Apache-2.0), 24x24 viewbox.
+export global Icons {
+    out property <string> play: "M8 5v14l11-7z";
+    out property <string> pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
+    out property <string> next: "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z";
+    out property <string> prev: "M6 6h2v12H6zm3.5 6l8.5 6V6z";
+    out property <string> shuffle: "M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z";
+    out property <string> repeat: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z";
+    out property <string> repeat-one: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z";
+    out property <string> volume-high: "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
+    out property <string> volume-low: "M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z";
+    out property <string> volume-off: "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z";
+    out property <string> lyrics: "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z";
+    out property <string> queue: "M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z";
+    out property <string> search: "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z";
+    out property <string> note: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z";
+    out property <string> album: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z";
+    out property <string> person: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z";
+    out property <string> songs: "M4 6h2v12H4zm4-2h2v16H8zm4 4h2v8h-2zm4-3h2v14h-2zm4 6h2v2h-2z";
+    out property <string> settings: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z";
+    out property <string> folder: "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z";
+    out property <string> chevron-down: "M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z";
+    out property <string> chevron-right: "M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z";
+    out property <string> chevron-left: "M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z";
+    out property <string> close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z";
+    out property <string> add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
+    out property <string> refresh: "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    out property <string> check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
+    out property <string> play-next: "M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z";
+    out property <string> trash: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z";
+    out property <string> playlist: "M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z";
+    out property <string> playlist-add: "M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z";
+    out property <string> edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
+    out property <string> magic: "M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z";
+}

@@ -1,0 +1,64 @@
+[package]
+name = "wisp"
+version = "0.1.0"
+edition = "2024"
+description = "A featherweight, gapless desktop audio player"
+authors = ["Claude (Anthropic) <noreply@anthropic.com>"]
+license = "GPL-3.0-only"
+readme = "README.md"
+repository = "https://github.com/DividedsWhimsicalVHS/WispPlayer"
+keywords = ["audio", "music-player", "gapless", "slint"]
+categories = ["multimedia::audio"]
+publish = false
+
+[features]
+screenshot = []
+
+[dependencies]
+# UI: Slint with the CPU (software) renderer. No GPU driver is ever loaded, which is
+# where most of the "hello world" RAM of GL/wgpu toolkits goes. `unstable-winit-030` is only used to
+# ask which monitor the window opened on, so it can be fitted to the screen.
+slint = { version = "1.19", default-features = false, features = [
+    "std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "accessibility",
+    "unstable-winit-030",
+] }
+
+# Decoding: pure Rust. Opus is decoded by a separate pure-Rust decoder.
+symphonia = { version = "0.6", default-features = false, features = [
+    "mp3", "aac", "alac", "flac", "vorbis", "pcm", "wav", "aiff", "isomp4", "ogg", "mkv",
+    "id3v1", "id3v2", "ape",
+] }
+opus-decoder = "0.1"
+rubato = "5"
+
+# Output + real-time plumbing.
+cpal = "0.18"
+crossbeam-queue = "0.3"
+
+# Library index, artwork, dialogs, shuffle.
+redb = "5"
+jpeg-decoder = "0.3"
+png = "0.18"
+rfd = { version = "0.18", default-features = false }
+fastrand = "2"
+
+# The track editor's lookups (MusicBrainz, Cover Art Archive, LRCLIB). TLS comes from the
+# operating system (SChannel on Windows) with its own certificate store: no bundled crypto.
+ureq = { version = "3.5", default-features = false, features = ["native-tls-no-default", "gzip"] }
+serde_json = "1"
+
+[build-dependencies]
+slint-build = "1.19"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+# panic stays "unwind": a corrupt file that trips a decoder bug must not kill playback.
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

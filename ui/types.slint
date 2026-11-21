@@ -1,0 +1,78 @@
+// Data shapes shared between the Rust controller and the UI.
+
+export struct TrackRow {
+    id: int,
+    title: string,
+    artist: string,
+    album: string,
+    duration: string,
+    /// Track number inside its album, or "" when the list is not an album.
+    number: string,
+    /// What the tags leave out: 1 no artist, 2 no real title (missing, or only a file name), 4 no cover
+    /// (added together; 0 for a complete song).
+    flags: int,
+}
+
+export struct QueueRow {
+    uid: int,
+    track: int,
+    title: string,
+    artist: string,
+    duration: string,
+}
+
+export struct AlbumData {
+    index: int,
+    title: string,
+    artist: string,
+    year: string,
+    art: image,
+    has-art: bool,
+}
+
+export struct ArtistData {
+    index: int,
+    name: string,
+    albums: string,
+    initial: string,
+}
+
+export struct LyricLine {
+    text: string,
+    time: int,
+}
+
+/// One match in the track editor's search results.
+export struct ResultRow {
+    title: string,
+    artist: string,
+    /// "Graduation · 2007 · Track 3"
+    detail: string,
+    thumb: image,
+    has-thumb: bool,
+    /// Lyrics found for it: 0 none (yet), 1 plain, 2 synced.
+    lyrics: int,
+    /// The recording is about as long as the file.
+    same-length: bool,
+}
+
+/// One theme in the picker, drawn as a miniature: window, sidebar, card, text line and accent.
+export struct ThemeCard {
+    id: string,
+    name: string,
+    bg: color,
+    panel: color,
+    card: color,
+    text: color,
+    accent: color,
+}
+
+export struct ThemeGroup {
+    title: string,
+    themes: [ThemeCard],
+}
+
+export struct DeviceRow {
+    id: string,
+    name: string,
+}

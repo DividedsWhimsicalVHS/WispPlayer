@@ -1,0 +1,562 @@
+import { Theme, Icons } from "theme.slint";
+import { Icon, IconButton, Cover } from "widgets.slint";
+import { TrackRow, QueueRow, AlbumData, ArtistData } from "types.slint";
+
+// Rows lay their columns out from explicit geometry (not layouts): it is deterministic, cheap,
+// and keeps columns aligned across rows.
+
+/// One song in a list. Single click on the leading cell or double click anywhere plays it.
+export component SongRow inherits Rectangle {
+    in property <TrackRow> track;
+    in property <bool> current: false;
+    in property <bool> playing: false;
+    in property <bool> show-album: true;
+    /// Rows of a playlist offer "Remove from playlist".
+    in property <bool> removable: false;
+    callback play();
+    callback play-next();
+    callback enqueue();
+    callback remove();
+    /// Opens the playlist menu at this window position.
+    callback add-to-playlist(length, length);
+    out property <bool> hovered: ta.has-hover || lead-ta.has-hover || b-pl.hovered || b-next.hovered || b-add.hovered || b-del.hovered;
+
+    private property <length> pad: 24px;
+    private property <length> gap: 12px;
+    private property <length> lead-w: 28px;
+    private property <length> act-w: root.removable ? 142px : 106px;
+    private property <length> dur-w: 52px;
+    /// Space shared by the title and album columns.
+    private property <length> flex: max(120px, root.width - 2 * root.pad - root.lead-w - root.act-w - root.dur-w - (root.show-album ? 4 : 3) * root.gap);
+    private property <length> title-x: root.pad + root.lead-w + root.gap;
+    private property <length> title-w: root.show-album ? root.flex * 0.58 : root.flex;
+    private property <length> album-x: root.title-x + root.title-w + root.gap;
+    private property <length> album-w: root.flex - root.title-w;
+    private property <length> act-x: root.width - root.pad - root.dur-w - root.gap - root.act-w;
+
+    height: Theme.row-h;
+
+    Rectangle {
+        x: 8px;
+        y: 1px;
+        width: parent.width - 16px;
+        height: parent.height - 2px;
+        border-radius: 10px * Theme.rounding;
+        background: root.current ? Theme.accent.with-alpha(0.15) : root.hovered ? Theme.hover : transparent;
+        animate background { duration: 100ms; }
+    }
+    ta := TouchArea {
+        accessible-role: list-item;
+        accessible-label: root.track.title + ", " + root.track.artist;
+        accessible-action-default => { root.play(); }
+        double-clicked => { root.play(); }
+    }
+    // leading cell: track number, now-playing marker, or a play button on hover
+    Rectangle {
+        x: root.pad;
+        y: 0px;
+        width: root.lead-w;
+        height: parent.height;
+        if root.hovered: Icon {
+            d: root.current && root.playing ? Icons.pause : Icons.play;
+            width: 20px;
+            height: 20px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.text;
+        }
+        if !root.hovered && root.current: Icon {
+            d: Icons.volume-high;
+            width: 18px;
+            height: 18px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.accent;
+        }
+        if !root.hovered && !root.current: Text {
+            width: parent.width;
+            height: parent.height;
+            text: root.track.number;
+            font-size: 14px;
+            color: Theme.text-3;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        lead-ta := TouchArea {
+            mouse-cursor: pointer;
+            accessible-role: button;
+            accessible-label: "Play " + root.track.title;
+            accessible-action-default => { root.play(); }
+            clicked => { root.play(); }
+        }
+    }
+    VerticalLayout {
+        x: root.title-x;
+        y: 0px;
+        width: root.title-w;
+        height: parent.height;
+        alignment: center;
+        spacing: 1px;
+        Text {
+            text: root.track.title;
+            font-size: 15px;
+            font-weight: root.current ? 600 : 500;
+            color: root.current ? Theme.accent-text : Theme.text;
+            overflow: elide;
+        }
+        Text {
+            text: root.track.artist;
+            font-size: 13px;
+            color: Theme.text-2;
+            overflow: elide;
+            visible: Theme.density > 0;
+            height: Theme.density > 0 ? self.preferred-height : 0px;
+        }
+    }
+    if root.show-album: Text {
+        x: root.album-x;
+        y: 0px;
+        width: root.album-w;
+        height: parent.height;
+        text: root.track.album;
+        font-size: 14px;
+        color: Theme.text-2;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    b-pl := IconButton {
+        d: Icons.playlist-add;
+        label: "Add to playlist";
+        size: 32px;
+        glyph: 18px;
+        x: root.act-x;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        visible: root.hovered;
+        clicked => { root.add-to-playlist(self.absolute-position.x, self.absolute-position.y + self.height); }
+    }
+    b-next := IconButton {
+        d: Icons.play-next;
+        label: "Play next";
+        size: 32px;
+        glyph: 18px;
+        x: root.act-x + 36px;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        visible: root.hovered;
+        clicked => { root.play-next(); }
+    }
+    b-add := IconButton {
+        d: Icons.add;
+        label: "Add to queue";
+        size: 32px;
+        glyph: 18px;
+        x: root.act-x + 72px;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        visible: root.hovered;
+        clicked => { root.enqueue(); }
+    }
+    b-del := IconButton {
+        d: Icons.close;
+        label: "Remove from playlist";
+        size: 32px;
+        glyph: 18px;
+        x: root.act-x + 108px;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        visible: root.removable && root.hovered;
+        clicked => { root.remove(); }
+    }
+    Text {
+        x: root.width - root.pad - root.dur-w;
+        y: 0px;
+        width: root.dur-w;
+        height: parent.height;
+        text: root.track.duration;
+        font-size: 14px;
+        color: Theme.text-2;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+export component QueueItem inherits Rectangle {
+    in property <QueueRow> entry;
+    in property <bool> current: false;
+    in property <bool> playing: false;
+    callback play();
+    callback remove();
+    out property <bool> hovered: ta.has-hover || lead-ta.has-hover || b-del.hovered;
+
+    private property <length> pad: 24px;
+    private property <length> gap: 12px;
+    private property <length> lead-w: 28px;
+    private property <length> dur-w: 52px;
+    private property <length> del-w: 32px;
+
+    height: Theme.row-h;
+    Rectangle {
+        x: 8px;
+        y: 1px;
+        width: parent.width - 16px;
+        height: parent.height - 2px;
+        border-radius: 10px * Theme.rounding;
+        background: root.current ? Theme.accent.with-alpha(0.15) : root.hovered ? Theme.hover : transparent;
+        animate background { duration: 100ms; }
+    }
+    ta := TouchArea {
+        accessible-role: list-item;
+        accessible-label: root.entry.title + ", " + root.entry.artist;
+        accessible-action-default => { root.play(); }
+        double-clicked => { root.play(); }
+    }
+    Rectangle {
+        x: root.pad;
+        y: 0px;
+        width: root.lead-w;
+        height: parent.height;
+        if root.current: Icon {
+            d: Icons.volume-high;
+            width: 18px;
+            height: 18px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.accent;
+        }
+        if !root.current && root.hovered: Icon {
+            d: Icons.play;
+            width: 20px;
+            height: 20px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.text;
+        }
+        lead-ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.play(); }
+        }
+    }
+    VerticalLayout {
+        x: root.pad + root.lead-w + root.gap;
+        y: 0px;
+        width: max(60px, root.width - 2 * root.pad - root.lead-w - root.del-w - root.dur-w - 3 * root.gap);
+        height: parent.height;
+        alignment: center;
+        spacing: 1px;
+        Text {
+            text: root.entry.title;
+            font-size: 15px;
+            font-weight: root.current ? 600 : 500;
+            color: root.current ? Theme.accent-text : Theme.text;
+            overflow: elide;
+        }
+        Text {
+            text: root.entry.artist;
+            font-size: 13px;
+            color: Theme.text-2;
+            overflow: elide;
+            visible: Theme.density > 0;
+            height: Theme.density > 0 ? self.preferred-height : 0px;
+        }
+    }
+    b-del := IconButton {
+        d: Icons.close;
+        label: "Remove from queue";
+        size: 32px;
+        glyph: 16px;
+        x: root.width - root.pad - root.dur-w - root.gap - root.del-w;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        visible: root.hovered && !root.current;
+        clicked => { root.remove(); }
+    }
+    Text {
+        x: root.width - root.pad - root.dur-w;
+        y: 0px;
+        width: root.dur-w;
+        height: parent.height;
+        text: root.entry.duration;
+        font-size: 14px;
+        color: Theme.text-2;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+/// An album tile: square cover, title, artist. Width is set by the grid; height follows.
+export component AlbumCard inherits Rectangle {
+    in property <AlbumData> album;
+    callback open();
+    callback play();
+
+    height: self.width + 52px;
+
+    cover := Cover {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.width;
+        art: root.album.art;
+        has-art: root.album.has-art;
+        seed: root.album.index;
+        radius: 12px * Theme.rounding;
+        shadow: true;
+    }
+    // Hover shade + play button on the cover.
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.width;
+        border-radius: 12px * Theme.rounding;
+        background: #00000040;
+        opacity: ta.has-hover || play-btn.hovered ? 1 : 0;
+        animate opacity { duration: 120ms; }
+    }
+    play-btn := Rectangle {
+        property <bool> hovered: play-ta.has-hover;
+        width: 40px;
+        height: 40px;
+        border-radius: 20px * Theme.circle;
+        x: parent.width - self.width - 10px;
+        y: parent.width - self.height - 10px;
+        background: Theme.accent;
+        opacity: ta.has-hover || play-ta.has-hover ? 1 : 0;
+        animate opacity { duration: 120ms; }
+        Icon {
+            d: Icons.play;
+            width: 22px;
+            height: 22px;
+            x: (parent.width - self.width) / 2 + 1px;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.on-accent;
+        }
+        play-ta := TouchArea {
+            mouse-cursor: pointer;
+            enabled: ta.has-hover || self.has-hover;
+            accessible-role: button;
+            accessible-label: "Play " + root.album.title;
+            accessible-action-default => { root.play(); }
+            clicked => { root.play(); }
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: root.album.title + " by " + root.album.artist;
+        accessible-action-default => { root.open(); }
+        clicked => { root.open(); }
+    }
+    Text {
+        x: 2px;
+        y: parent.width + 9px;
+        width: parent.width - 4px;
+        text: root.album.title;
+        font-size: 14px;
+        font-weight: 600;
+        color: Theme.text;
+        overflow: elide;
+    }
+    Text {
+        x: 2px;
+        y: parent.width + 29px;
+        width: parent.width - 4px;
+        text: root.album.artist + (root.album.year != "" ? " · " + root.album.year : "");
+        font-size: 13px;
+        color: Theme.text-2;
+        overflow: elide;
+    }
+}
+
+export component ArtistItem inherits Rectangle {
+    in property <ArtistData> artist;
+    callback open();
+
+    height: 60px;
+    Rectangle {
+        x: 8px;
+        y: 1px;
+        width: parent.width - 16px;
+        height: parent.height - 2px;
+        border-radius: 10px * Theme.rounding;
+        background: ta.pressed ? Theme.press : ta.has-hover ? Theme.hover : transparent;
+        animate background { duration: 100ms; }
+    }
+    Rectangle {
+        x: 24px;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 40px;
+        border-radius: 20px * Theme.circle;
+        background: @linear-gradient(135deg, Theme.accent.with-alpha(0.9) 0%, Theme.accent.darker(0.5) 100%);
+        Text {
+            width: parent.width;
+            height: parent.height;
+            text: root.artist.initial;
+            font-size: 17px;
+            font-weight: 700;
+            color: #ffffff;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    VerticalLayout {
+        x: 78px;
+        y: 0px;
+        width: parent.width - 78px - 64px;
+        height: parent.height;
+        alignment: center;
+        spacing: 1px;
+        Text {
+            text: root.artist.name;
+            font-size: 15px;
+            font-weight: 600;
+            color: Theme.text;
+            overflow: elide;
+        }
+        Text {
+            text: root.artist.albums;
+            font-size: 13px;
+            color: Theme.text-2;
+        }
+    }
+    Icon {
+        d: Icons.chevron-right;
+        width: 20px;
+        height: 20px;
+        x: parent.width - 24px - self.width;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-3;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: root.artist.name;
+        accessible-action-default => { root.open(); }
+        clicked => { root.open(); }
+    }
+}
+
+component Chip inherits Rectangle {
+    in property <string> text;
+    height: 20px;
+    width: label.preferred-width + 16px;
+    border-radius: 10px * Theme.rounding;
+    background: Theme.accent.with-alpha(0.20);
+    label := Text {
+        x: 8px;
+        y: 0px;
+        width: parent.width - 16px;
+        height: parent.height;
+        text: root.text;
+        font-size: 11px;
+        font-weight: 600;
+        color: Theme.accent-text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+/// A song whose tags leave something out. It is highlighted so that incomplete songs stand out,
+/// the reasons are spelled out, and opening it starts the lookup.
+export component FlaggedItem inherits Rectangle {
+    in property <TrackRow> track;
+    callback open();
+
+    // `flags` adds up 1 (no artist), 2 (title looks like a file name) and 4 (no cover).
+    private property <bool> no-artist: mod(root.track.flags, 2) == 1;
+    private property <bool> bad-title: mod(floor(root.track.flags / 2), 2) == 1;
+    private property <bool> no-cover: mod(floor(root.track.flags / 4), 2) == 1;
+
+    height: 70px;
+    Rectangle {
+        x: 8px;
+        y: 2px;
+        width: parent.width - 16px;
+        height: parent.height - 4px;
+        border-radius: 10px * Theme.rounding;
+        background: ta.pressed ? Theme.accent.with-alpha(0.26) : ta.has-hover ? Theme.accent.with-alpha(0.19) : Theme.accent.with-alpha(0.09);
+        border-width: 1px;
+        border-color: Theme.accent.with-alpha(ta.has-hover ? 0.6 : 0.28);
+        animate background, border-color { duration: 100ms; }
+        Rectangle {
+            x: 0px;
+            y: 10px;
+            width: 4px;
+            height: parent.height - 20px;
+            border-radius: 2px;
+            background: Theme.accent;
+        }
+    }
+    Rectangle {
+        x: 28px;
+        y: (parent.height - self.height) / 2;
+        width: 34px;
+        height: 34px;
+        border-radius: 17px * Theme.circle;
+        background: Theme.accent.with-alpha(0.22);
+        Text {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height;
+            text: "?";
+            font-size: 18px;
+            font-weight: 700;
+            color: Theme.accent-text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    Text {
+        x: 78px;
+        y: 13px;
+        width: parent.width - 78px - 56px;
+        text: root.track.title;
+        font-size: 15px;
+        font-weight: 600;
+        color: Theme.text;
+        overflow: elide;
+    }
+    HorizontalLayout {
+        x: 78px;
+        y: 38px;
+        width: parent.width - 78px - 56px;
+        height: 20px;
+        spacing: 6px;
+        alignment: start;
+        if !root.no-artist: Text {
+            width: min(self.preferred-width, 180px);
+            text: root.track.artist;
+            font-size: 12px;
+            color: Theme.text-2;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.no-artist: Chip {
+            text: "No artist";
+        }
+        if root.bad-title: Chip {
+            text: "No real title";
+        }
+        if root.no-cover: Chip {
+            text: "No cover";
+        }
+    }
+    Icon {
+        d: Icons.chevron-right;
+        width: 22px;
+        height: 22px;
+        x: parent.width - 24px - self.width;
+        y: (parent.height - self.height) / 2;
+        tint: ta.has-hover ? Theme.accent : Theme.text-3;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: "Look up " + root.track.title;
+        accessible-action-default => { root.open(); }
+        clicked => { root.open(); }
+    }
+}
