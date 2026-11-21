@@ -452,7 +452,14 @@ pub fn lyrics_mode(ctl: &Ctl, mode: i32) {
     set_lyrics_text(&app, open, text);
 }
 
+/// "Choose image…" has no picker to use on a phone (the button is not shown there).
+#[cfg(mobile)]
+pub fn choose_cover(ctl: &Ctl) {
+    toast(ctl, "Picking an image isn't available on phones yet");
+}
+
 /// "Choose image…": a JPEG or PNG from disk for the cover.
+#[cfg(desktop)]
 pub fn choose_cover(ctl: &Ctl) {
     let _ = ctl;
     std::thread::spawn(|| {
@@ -463,6 +470,7 @@ pub fn choose_cover(ctl: &Ctl) {
     });
 }
 
+#[cfg(desktop)]
 fn cover_chosen(ctl: &Ctl, bytes: Option<Vec<u8>>) {
     let Some(ui) = ui_of(ctl) else { return };
     let Some(bytes) = bytes else { return toast(ctl, "Couldn't read that image") };
@@ -569,20 +577,20 @@ mod tests {
     #[test]
     fn the_search_starts_from_the_file_name_when_the_title_is_only_that() {
         let raw = flag::NO_ARTIST | flag::BAD_TITLE | flag::NO_COVER;
-        assert_eq!(first_query(&song(r"C:\Music\04. Daft Punk - Around the World (Official Audio) [320kbps].mp3", "04. Daft Punk - Around the World (Official Audio) [320kbps]", "Unknown Artist", raw)), "Daft Punk - Around the World");
-        assert_eq!(first_query(&song(r"C:\Music\Kanye_West_-_Flashing_Lights.mp3", "Kanye_West_-_Flashing_Lights", "Unknown Artist", raw)), "Kanye West - Flashing Lights");
+        assert_eq!(first_query(&song("/Music/04. Daft Punk - Around the World (Official Audio) [320kbps].mp3", "04. Daft Punk - Around the World (Official Audio) [320kbps]", "Unknown Artist", raw)), "Daft Punk - Around the World");
+        assert_eq!(first_query(&song("/Music/Kanye_West_-_Flashing_Lights.mp3", "Kanye_West_-_Flashing_Lights", "Unknown Artist", raw)), "Kanye West - Flashing Lights");
         // A real title with no artist, and a real title with an artist.
-        assert_eq!(first_query(&song(r"C:\Music\x.mp3", "Flashing Lights", "Unknown Artist", flag::NO_ARTIST)), "Flashing Lights");
-        assert_eq!(first_query(&song(r"C:\Music\x.mp3", "Flashing Lights", "Kanye West", flag::NO_COVER)), "Kanye West - Flashing Lights");
+        assert_eq!(first_query(&song("/Music/x.mp3", "Flashing Lights", "Unknown Artist", flag::NO_ARTIST)), "Flashing Lights");
+        assert_eq!(first_query(&song("/Music/x.mp3", "Flashing Lights", "Kanye West", flag::NO_COVER)), "Kanye West - Flashing Lights");
     }
 
     #[test]
     fn the_form_starts_from_the_tags_without_placeholders() {
-        let mut t = song(r"C:\Music\09 Flashing Lights.mp4", "AUDIO_294", "Unknown Artist", flag::NO_ARTIST | flag::BAD_TITLE | flag::NO_COVER);
+        let mut t = song("/Music/09 Flashing Lights.mp4", "AUDIO_294", "Unknown Artist", flag::NO_ARTIST | flag::BAD_TITLE | flag::NO_COVER);
         t.album_artist = "Unknown Artist".into();
         let f = first_fields(&t);
         assert_eq!((f.title.as_str(), f.artist.as_str(), f.album.as_str(), f.album_artist.as_str()), ("AUDIO 294", "", "", ""));
-        let mut t = song(r"C:\Music\x.mp3", "Intro", "Björk", flag::NO_COVER);
+        let mut t = song("/Music/x.mp3", "Intro", "Björk", flag::NO_COVER);
         (t.album, t.year, t.track_no) = ("Homogenic".into(), 1997, 1);
         let f = first_fields(&t);
         assert_eq!((f.title.as_str(), f.artist.as_str(), f.album.as_str(), f.year, f.track_no), ("Intro", "Björk", "Homogenic", 1997, 1));

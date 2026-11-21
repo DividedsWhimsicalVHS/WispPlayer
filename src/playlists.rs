@@ -164,6 +164,11 @@ mod tests {
         d
     }
 
+    /// A song's path the way the platform writes an absolute one (`C:\...` or `/...`).
+    fn abs(name: &str) -> String {
+        std::env::temp_dir().join("wisp-pl-songs").join(name).to_string_lossy().into_owned()
+    }
+
     #[test]
     fn create_add_remove_rename_delete() {
         let dir = temp("crud");
@@ -172,16 +177,16 @@ mod tests {
         let p = pls.create("Road Trip").unwrap();
         assert!(pls.create("road trip").is_err(), "names are unique ignoring case");
         assert!(pls.create("   ").is_err());
-        assert_eq!(pls.add(&p, &["C:\\a.mp3".into(), "C:\\b.flac".into()]).unwrap(), 2);
-        assert_eq!(pls.add(&p, &["C:\\a.mp3".into(), "C:\\c.mp3".into()]).unwrap(), 1, "already-present songs are skipped");
-        assert_eq!(pls.paths(&p), ["C:\\a.mp3", "C:\\b.flac", "C:\\c.mp3"]);
-        pls.remove(&p, "C:\\b.flac").unwrap();
-        assert_eq!(pls.paths(&p), ["C:\\a.mp3", "C:\\c.mp3"]);
+        assert_eq!(pls.add(&p, &[abs("a.mp3"), abs("b.flac")]).unwrap(), 2);
+        assert_eq!(pls.add(&p, &[abs("a.mp3"), abs("c.mp3")]).unwrap(), 1, "already-present songs are skipped");
+        assert_eq!(pls.paths(&p), [abs("a.mp3"), abs("b.flac"), abs("c.mp3")]);
+        pls.remove(&p, &abs("b.flac")).unwrap();
+        assert_eq!(pls.paths(&p), [abs("a.mp3"), abs("c.mp3")]);
 
         let p = pls.rename(&p, "Summer: Road/Trip?").unwrap();
         assert_eq!(p.name, "Summer: Road/Trip?", "the name keeps every character...");
         assert_eq!(p.file.file_name().unwrap(), "Summer_ Road_Trip_.m3u8", "...the file name stays legal");
-        assert_eq!(pls.paths(&p), ["C:\\a.mp3", "C:\\c.mp3"], "songs survive a rename");
+        assert_eq!(pls.paths(&p), [abs("a.mp3"), abs("c.mp3")], "songs survive a rename");
         assert_eq!(pls.list(), [p.clone()]);
 
         pls.create("Another").unwrap();

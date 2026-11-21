@@ -1,8 +1,8 @@
 [package]
 name = "wisp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "A featherweight, gapless desktop audio player"
+description = "A featherweight, gapless audio player for local files"
 authors = ["Claude (Anthropic) <noreply@anthropic.com>"]
 license = "GPL-3.0-only"
 readme = "README.md"
@@ -15,14 +15,6 @@ publish = false
 screenshot = []
 
 [dependencies]
-# UI: Slint with the CPU (software) renderer. No GPU driver is ever loaded, which is
-# where most of the "hello world" RAM of GL/wgpu toolkits goes. `unstable-winit-030` is only used to
-# ask which monitor the window opened on, so it can be fitted to the screen.
-slint = { version = "1.19", default-features = false, features = [
-    "std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "accessibility",
-    "unstable-winit-030",
-] }
-
 # Decoding: pure Rust. Opus is decoded by a separate pure-Rust decoder.
 symphonia = { version = "0.6", default-features = false, features = [
     "mp3", "aac", "alac", "flac", "vorbis", "pcm", "wav", "aiff", "isomp4", "ogg", "mkv",
@@ -35,17 +27,42 @@ rubato = "5"
 cpal = "0.18"
 crossbeam-queue = "0.3"
 
-# Library index, artwork, dialogs, shuffle.
+# Library index, artwork, shuffle.
 redb = "5"
 jpeg-decoder = "0.3"
 png = "0.18"
-rfd = { version = "0.18", default-features = false }
 fastrand = "2"
-
-# The track editor's lookups (MusicBrainz, Cover Art Archive, LRCLIB). TLS comes from the
-# operating system (SChannel on Windows) with its own certificate store: no bundled crypto.
-ureq = { version = "3.5", default-features = false, features = ["native-tls-no-default", "gzip"] }
 serde_json = "1"
+
+# -- the parts that differ between computers and phones ------------------------------------------
+
+# UI: Slint. On computers it draws with the CPU (software) renderer: no GPU driver is ever loaded,
+# which is where most of the "hello world" RAM of GL/wgpu toolkits goes. `unstable-winit-030` is only
+# used to ask which monitor the window opened on, so it can be fitted to the screen.
+[target.'cfg(not(target_os = "android"))'.dependencies]
+slint = { version = "1.19", default-features = false, features = [
+    "std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "accessibility",
+    "unstable-winit-030",
+] }
+
+# On Android Slint's own backend draws the window; `android_main` (in the `android` crate) starts it.
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { version = "1.19", default-features = false, features = ["std", "compat-1-2", "backend-android-activity-06"] }
+
+# Folder and image pickers: Windows and macOS have their own dialogs, Linux asks the desktop portal
+# (which is also what works inside a Flatpak). Phones have no picker here.
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+rfd = { version = "0.18", default-features = false }
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd = { version = "0.18", default-features = false, features = ["xdg-portal"] }
+
+# The track editor's lookups (MusicBrainz, Cover Art Archive, LRCLIB). On Windows TLS comes from the
+# operating system (SChannel) with its own certificate store: no bundled crypto. Everywhere else it is
+# rustls with the bundled Mozilla roots, so Linux sandboxes and Android need no system TLS library.
+[target.'cfg(windows)'.dependencies]
+ureq = { version = "3.5", default-features = false, features = ["native-tls-no-default", "gzip"] }
+[target.'cfg(not(windows))'.dependencies]
+ureq = { version = "3.5", default-features = false, features = ["rustls", "gzip"] }
 
 [build-dependencies]
 slint-build = "1.19"

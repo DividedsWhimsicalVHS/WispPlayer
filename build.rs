@@ -6,7 +6,18 @@ use std::{env, fs};
 
 fn main() {
     slint_build::compile("ui/app.slint").expect("slint compile failed");
+    platform_kind();
     windows_resources();
+}
+
+/// `cfg(desktop)` for computers (windows to place, folders to pick) and `cfg(mobile)` for phones.
+fn platform_kind() {
+    println!("cargo:rustc-check-cfg=cfg(desktop)");
+    println!("cargo:rustc-check-cfg=cfg(mobile)");
+    match env::var("CARGO_CFG_TARGET_OS").as_deref() {
+        Ok("android" | "ios") => println!("cargo:rustc-cfg=mobile"),
+        _ => println!("cargo:rustc-cfg=desktop"),
+    }
 }
 
 /// The icon and the "Details" tab of wisp.exe, from `assets/icon/wisp.ico`. They are compiled with

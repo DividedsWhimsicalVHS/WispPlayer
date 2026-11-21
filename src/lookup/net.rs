@@ -28,6 +28,19 @@ pub struct Net {
     agent: ureq::Agent,
 }
 
+/// Windows trusts what the operating system trusts (SChannel, its own certificate store).
+#[cfg(windows)]
+fn tls() -> TlsConfig {
+    TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build()
+}
+
+/// Everywhere else: rustls with the Mozilla roots built in, so no system TLS library is needed (a
+/// Flatpak sandbox and Android have none to rely on).
+#[cfg(not(windows))]
+fn tls() -> TlsConfig {
+    TlsConfig::builder().provider(TlsProvider::Rustls).root_certs(RootCerts::WebPki).build()
+}
+
 /// `Wisp/0.1.0 ( contact )`, the form MusicBrainz and LRCLIB ask for.
 pub fn user_agent(contact: &str) -> String {
     let version = env!("CARGO_PKG_VERSION");
@@ -61,9 +74,8 @@ fn pace_musicbrainz() {
 
 impl Net {
     pub fn new(contact: &str) -> Net {
-        let tls = TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build();
         let agent = ureq::Agent::config_builder()
-            .tls_config(tls)
+            .tls_config(tls())
             .user_agent(user_agent(contact))
             .timeout_global(Some(Duration::from_secs(20)))
             .http_status_as_error(false)

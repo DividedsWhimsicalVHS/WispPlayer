@@ -47,6 +47,7 @@ const ACCENTS: [[u8; 3]; 8] = [
     [0x9b, 0x5c, 0xf0],
     [0xff, 0x5c, 0x93],
 ];
+#[cfg(desktop)]
 const SCALES: [f32; 5] = [0.9, 1.0, 1.1, 1.25, 1.5];
 
 struct State {
@@ -80,8 +81,10 @@ struct State {
     /// Brightness of the playing artwork (0 to 1), for the Album Chameleon theme.
     backdrop_luma: f32,
     /// The monitor's own scale factor; 0 until the native window exists and reports it.
+    #[cfg_attr(mobile, allow(dead_code))]
     base_scale: f32,
     /// The scale factor (native x UI-size setting) this controller last put into effect.
+    #[cfg_attr(mobile, allow(dead_code))]
     applied_scale: f32,
     /// `WISP_DEBUG` is set: print playback health to stderr.
     debug: bool,
@@ -145,13 +148,31 @@ fn parse_hex(s: &str) -> Option<[u8; 3]> {
 // Startup
 // ---------------------------------------------------------------------------------------------
 
+/// What the window manager and the Flatpak know the program as: the window's Wayland `app_id` must
+/// match the name of its `.desktop` file for the dock to show the right icon.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub const APP_ID: &str = "io.github.DividedsWhimsicalVHS.WispPlayer";
+
+/// A message for a failure that happens before there is a window to show it in.
+#[cfg(any(windows, target_os = "macos"))]
+fn show_error(message: &str) {
+    let _ = rfd::MessageDialog::new().set_title("Wisp").set_description(message).show();
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn show_error(message: &str) {
+    eprintln!("wisp: {message}");
+}
+
 pub fn run() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    let _ = slint::set_xdg_app_id(APP_ID);
     let dir = settings::data_dir();
     let mut settings = Settings::load(&dir);
     let lib = match Library::open(&dir.join("library.redb")) {
         Ok(l) => Arc::new(l),
         Err(e) => {
-            let _ = rfd::MessageDialog::new().set_title("Wisp").set_description(&e).show();
+            show_error(&e);
             return Err(e);
         }
     };
@@ -248,7 +269,8 @@ pub fn run() -> Result<(), String> {
     wire_callbacks(&ui, &ctl);
     apply_all_settings(&ctl);
 
-    // Window: restore size, wire close.
+    // Window: restore size, wire close. (A phone's window is the screen.)
+    #[cfg(desktop)]
     {
         // Logical size at the monitor's native scale; the window is fitted to the screen once it exists.
         let c = ctl.borrow();
@@ -298,11 +320,14 @@ fn player_queue(player: &Player) -> Arc<std::sync::Mutex<player::queue::Queue>> 
 
 fn save_on_exit(ctl: &Ctl, ui: &MainWindow) {
     let mut c = ctl.borrow_mut();
-    let size = ui.window().size();
-    // Native logical size, so the UI-size setting does not change the window between runs.
-    let scale = if c.base_scale > 0.0 { c.base_scale } else { ui.window().scale_factor().max(0.1) };
-    c.settings.set("window_w", (size.width as f32 / scale).round());
-    c.settings.set("window_h", (size.height as f32 / scale).round());
+    #[cfg(desktop)]
+    {
+        let size = ui.window().size();
+        // Native logical size, so the UI-size setting does not change the window between runs.
+        let scale = if c.base_scale > 0.0 { c.base_scale } else { ui.window().scale_factor().max(0.1) };
+        c.settings.set("window_w", (size.width as f32 / scale).round());
+        c.settings.set("window_h", (size.height as f32 / scale).round());
+    }
     let vol = ui.global::<App>().get_volume();
     c.settings.set("volume", vol);
     c.settings.save();
@@ -384,6 +409,7 @@ fn wire_callbacks(ui: &MainWindow, ctl: &Ctl) {
     on!(app, ctl, on_lyrics_seek, |ms| ctl.borrow().player.seek_ms(ms.max(0) as u64));
 
     // settings
+    #[cfg(desktop)]
     on!(app, ctl, on_add_folder, | | add_folder(ctl));
     on!(app, ctl, on_remove_folder, |i| remove_folder(ctl, i as usize));
     on!(app, ctl, on_rescan, | | start_scan(ctl));
@@ -573,8 +599,17 @@ fn apply_audio_settings(ctl: &Ctl) {
     );
 }
 
+// A phone's window is the screen: there is no UI-size setting to apply and nothing to fit.
+#[cfg(mobile)]
+fn apply_scale(_: &Ctl) {}
+#[cfg(mobile)]
+fn track_scale(_: &Ctl, _: &MainWindow) {}
+#[cfg(mobile)]
+fn settle_window(_: &Ctl, _: u32) {}
+
 /// UI size: native scale times the chosen factor. Applied by telling the window its scale changed;
 /// the window's pixel size stays, only how many logical pixels it holds changes.
+#[cfg(desktop)]
 fn apply_scale(ctl: &Ctl) {
     let Some(ui) = ui_of(ctl) else { return };
     let target = {
@@ -599,6 +634,7 @@ fn apply_scale(ctl: &Ctl) {
 /// The OS reports a scale factor of its own on first show and whenever the window moves to a
 /// monitor with another DPI. Any value other than the one applied here is the new native scale,
 /// so the UI-size setting is put on top of it again.
+#[cfg(desktop)]
 fn track_scale(ctl: &Ctl, ui: &MainWindow) {
     let seen = ui.window().scale_factor();
     if (seen - ctl.borrow().applied_scale).abs() > 1e-3 {
@@ -609,6 +645,7 @@ fn track_scale(ctl: &Ctl, ui: &MainWindow) {
 
 /// Runs once the native window exists (it is created lazily when the event loop starts): learns the
 /// monitor's scale, applies the UI-size setting and fits the window to the screen.
+#[cfg(desktop)]
 fn settle_window(ctl: &Ctl, attempt: u32) {
     use slint::winit_030::WinitWindowAccessor;
     let Some(ui) = ui_of(ctl) else { return };
@@ -631,6 +668,7 @@ fn settle_window(ctl: &Ctl, attempt: u32) {
 /// or heavily scaled display (1920x1080 at 150% is only 1280x720 logical), which would push the
 /// player bar off-screen. Shrinks to fit and centres; the margins leave room for a taskbar or dock
 /// on any edge.
+#[cfg(desktop)]
 fn fit_to_monitor(ui: &MainWindow) {
     use slint::winit_030::WinitWindowAccessor;
     let Some(Some((origin, screen, inner, outer))) = ui.window().with_winit_window(|w| {
@@ -1124,6 +1162,7 @@ fn scan_progress(ctl: &Ctl) {
     }
 }
 
+#[cfg(desktop)]
 fn add_folder(ctl: &Ctl) {
     let _ = ctl;
     std::thread::spawn(|| {
