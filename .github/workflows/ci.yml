@@ -51,22 +51,31 @@ jobs:
       - name: Validate the desktop entry
         run: desktop-file-validate flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.desktop
 
+  # Built on the runner, not in the flatpak-github-actions container: updating the SDK inside that
+  # container fails on its overlay file system whenever Flathub has a newer one than the image.
   flatpak:
     name: Flatpak (x86_64)
     needs: flatpak-metadata
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
-      options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      - name: Tools
+        run: |
+          # bubblewrap (the sandbox) needs user namespaces, which Ubuntu 24.04 restricts by default
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Build
+        run: |
+          flatpak-builder --user --disable-rofiles-fuse --install-deps-from=flathub --force-clean --repo=repo build-dir \
+            flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo repo \
+            WispPlayer-x86_64.flatpak io.github.DividedsWhimsicalVHS.WispPlayer
+      - uses: actions/upload-artifact@v4
         with:
-          bundle: WispPlayer-x86_64.flatpak
-          manifest-path: flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-          arch: x86_64
-
+          name: flatpak-x86_64
+          path: WispPlayer-x86_64.flatpak
   # The Android app: the player as a native library (cargo-ndk) inside a small Gradle project that adds
   # the activity and the playback service. Needs NDK r30: Slint's prebuilt Skia is built against its C++
   # library and crashes at startup with an older one.
@@ -98,6 +107,13 @@ jobs:
           if [ -z "$ndk" ]; then echo "the SDK manager offers no NDK r30"; "$sdkmanager" --list 2>/dev/null | grep ndk; exit 1; fi
           yes | "$sdkmanager" "$ndk" > /dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${ndk#ndk;}" >> "$GITHUB_ENV"
+      # cargo-ndk sets ANDROID_PLATFORM to the API level it builds for (26), which makes Slint's build
+      # script look for an SDK platform of that exact version; its Java helper needs a recent android.jar.
+      - name: Android SDK platform for Slint's Java helper
+        run: |
+          jar=$(ls "$ANDROID_HOME"/platforms/android-*/android.jar | sort -V | tail -1)
+          echo "using $jar"
+          echo "ANDROID_JAR=$jar" >> "$GITHUB_ENV"
       - run: cargo install cargo-ndk --locked
       - name: Native library (phones are arm64, the emulator on a computer is x86_64)
         run: cargo ndk --platform 26 -t arm64-v8a -t x86_64 -o android/app/src/main/jniLibs build --release --locked -p wisp-android
@@ -175,7 +191,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: WispPlayer-x86_64-x86_64.flatpak
+          name: flatpak-x86_64
           path: bundle
       - name: Tools
         run: |

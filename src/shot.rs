@@ -21,12 +21,12 @@ impl Platform for ShotPlatform {
     }
 }
 
-pub fn run(out: &Path, scene: &str, theme: &str, width: u32, height: u32) -> Result<(), String> {
+pub fn run(out: &Path, scene: &str, theme: &str, width: u32, height: u32, phone: bool) -> Result<(), String> {
     let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     slint::platform::set_platform(Box::new(ShotPlatform { window: window.clone() })).map_err(|e| e.to_string())?;
     let ui = MainWindow::new().map_err(|e| e.to_string())?;
     window.set_size(PhysicalSize::new(width, height));
-    demo::populate(&ui, scene, theme);
+    demo::populate(&ui, scene, theme, phone, width);
     ui.show().map_err(|e| e.to_string())?;
 
     // Let animations (cross-fades, scrolls) finish on the wall clock.

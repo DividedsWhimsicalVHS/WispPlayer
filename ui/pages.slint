@@ -1,43 +1,72 @@
 import { Theme, Icons } from "theme.slint";
-import { Icon, IconButton, PillButton, Segmented, Toggle, Slider, ListView, Cover, Soft, Bevel } from "widgets.slint";
-import { SongRow, QueueItem, AlbumCard, ArtistItem, FlaggedItem } from "rows.slint";
+import { Icon, IconButton, PillButton, Segmented, Toggle, Slider, ListView, Cover, Soft, Bevel, SearchField } from "widgets.slint";
+import { SongRow, QueueItem, AlbumCard, ArtistItem, FlaggedItem, PlaylistItem } from "rows.slint";
 import { App } from "state.slint";
 import { ThemeCard } from "types.slint";
+
+// Narrow windows (`Theme.compact`) get a lighter header, the search box that the sidebar holds on
+// wide ones, and pages that stack what would not fit side by side.
 
 component PageHeader inherits Rectangle {
     in property <string> title;
     in property <string> subtitle;
-    height: 96px;
+    /// A chevron before the title, for a page that sits inside another one.
+    in property <bool> back: false;
+    callback go-back();
+    private property <length> left: Theme.compact ? 16px : 28px;
+    /// Room taken by the back button.
+    private property <length> lead: root.back ? 44px : 0px;
+    height: Theme.compact ? 64px : 96px;
 
+    if root.back: IconButton {
+        x: Theme.compact ? 2px : 14px;
+        y: Theme.compact ? 8px : 22px;
+        d: Icons.chevron-left;
+        label: "Back";
+        clicked => { root.go-back(); }
+    }
     Text {
-        x: 28px;
-        y: 22px;
-        width: parent.width * 0.5;
+        x: root.left + root.lead;
+        y: Theme.compact ? 6px : 22px;
+        width: Theme.compact ? max(80px, parent.width - root.left - root.lead - actions.preferred-width - 20px) : parent.width * 0.5;
         text: root.title;
         font-family: Theme.title-font;
-        font-size: 34px;
+        font-size: Theme.compact ? 26px : 34px;
         font-weight: 700;
         color: Theme.text;
         overflow: elide;
     }
     Text {
-        x: 30px;
-        y: 64px;
-        width: parent.width * 0.5;
+        x: root.left + root.lead + 2px;
+        y: Theme.compact ? 38px : 64px;
+        width: Theme.compact ? max(80px, parent.width - root.left - root.lead - actions.preferred-width - 20px) : parent.width * 0.5;
         text: root.subtitle;
-        font-size: 14px;
+        font-size: Theme.compact ? 13px : 14px;
         color: Theme.text-2;
         overflow: elide;
     }
-    HorizontalLayout {
+    actions := HorizontalLayout {
         x: parent.width * 0.4;
         width: parent.width * 0.6;
-        height: 36px;
-        y: 30px;
-        padding-right: 24px;
-        spacing: 10px;
+        height: Theme.touch ? 44px : 36px;
+        y: Theme.compact ? 10px : 30px;
+        padding-right: Theme.compact ? 10px : 24px;
+        spacing: Theme.compact ? 4px : 10px;
         alignment: end;
         @children
+    }
+}
+
+/// The search box of narrow windows (wide ones have it in the sidebar).
+component CompactSearch inherits Rectangle {
+    height: 52px;
+    SearchField {
+        x: 16px;
+        y: 5px;
+        width: parent.width - 32px;
+        text: App.search-text;
+        placeholder: "Search";
+        edited(t) => { App.search(t); }
     }
 }
 
@@ -105,13 +134,14 @@ component EmptyState inherits Rectangle {
 }
 
 export component SongsPage inherits Rectangle {
-    property <length> head: App.filter-label != "" ? 134px : 100px;
+    // Narrow: header, search box and sort bar; wide: the header alone (search is in the sidebar).
+    property <length> head: Theme.compact ? (App.filter-label != "" ? 196px : 160px) : (App.filter-label != "" ? 134px : 100px);
 
     PageHeader {
         y: 0px;
         title: "Songs";
         subtitle: App.songs-subtitle;
-        Segmented {
+        if !Theme.compact: Segmented {
             width: 232px;
             items: ["Title", "Album", "Recent"];
             current: App.sort-index;
@@ -121,19 +151,30 @@ export component SongsPage inherits Rectangle {
             text: "Shuffle";
             d: Icons.shuffle;
             primary: false;
-            compact: root.width < 720px;
+            compact: Theme.compact || root.width < 720px;
             clicked => { App.play-all(true); }
         }
         PillButton {
             text: "Play";
             d: Icons.play;
-            compact: root.width < 720px;
+            compact: Theme.compact || root.width < 720px;
             clicked => { App.play-all(false); }
         }
     }
+    if Theme.compact: CompactSearch {
+        y: 64px;
+    }
+    if Theme.compact: Segmented {
+        x: 16px;
+        y: 118px;
+        width: parent.width - 32px;
+        items: ["Title", "Album", "Recent"];
+        current: App.sort-index;
+        selected(i) => { App.sort-changed(i); }
+    }
     if App.filter-label != "": FilterChip {
-        x: 28px;
-        y: 98px;
+        x: Theme.compact ? 16px : 28px;
+        y: Theme.compact ? 164px : 98px;
     }
     Rectangle {
         y: root.head - 2px;
@@ -152,6 +193,10 @@ export component SongsPage inherits Rectangle {
             play-next => { App.play-next-row(i); }
             enqueue => { App.enqueue-row(i); }
             add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+            more => {
+                App.sheet-removable = false;
+                App.sheet-row = i;
+            }
         }
     }
     if App.tracks.length == 0: EmptyState {
@@ -164,10 +209,10 @@ export component SongsPage inherits Rectangle {
 }
 
 export component AlbumsPage inherits Rectangle {
-    property <length> head: App.filter-label != "" ? 134px : 100px;
-    property <length> pad: 28px;
-    property <length> gap: 22px;
-    property <int> cols: max(2, floor((root.width - 2 * root.pad + root.gap) / (184px + root.gap)));
+    property <length> head: Theme.compact ? (App.filter-label != "" ? 158px : 122px) : (App.filter-label != "" ? 134px : 100px);
+    property <length> pad: Theme.compact ? 16px : 28px;
+    property <length> gap: Theme.compact ? 14px : 22px;
+    property <int> cols: max(2, floor((root.width - 2 * root.pad + root.gap) / ((Theme.compact ? 140px : 184px) + root.gap)));
     property <length> card-w: (root.width - 2 * root.pad - (root.cols - 1) * root.gap) / root.cols;
     property <int> grid-rows: ceil(App.albums.length / root.cols);
 
@@ -176,9 +221,12 @@ export component AlbumsPage inherits Rectangle {
         title: "Albums";
         subtitle: App.albums-subtitle;
     }
+    if Theme.compact: CompactSearch {
+        y: 64px;
+    }
     if App.filter-label != "": FilterChip {
-        x: 28px;
-        y: 98px;
+        x: Theme.compact ? 16px : 28px;
+        y: Theme.compact ? 120px : 98px;
     }
     ListView {
         y: root.head - 6px;
@@ -207,11 +255,14 @@ export component AlbumsPage inherits Rectangle {
 }
 
 export component ArtistsPage inherits Rectangle {
-    property <length> head: 100px;
+    property <length> head: Theme.compact ? 116px : 100px;
     PageHeader {
         y: 0px;
         title: "Artists";
         subtitle: App.artists-subtitle;
+    }
+    if Theme.compact: CompactSearch {
+        y: 64px;
     }
     Rectangle {
         y: root.head - 2px;
@@ -236,7 +287,7 @@ export component ArtistsPage inherits Rectangle {
 }
 
 export component QueuePage inherits Rectangle {
-    property <length> head: 100px;
+    property <length> head: Theme.compact ? 64px : 100px;
     PageHeader {
         y: 0px;
         title: "Queue";
@@ -245,13 +296,14 @@ export component QueuePage inherits Rectangle {
             text: "Save as playlist";
             d: Icons.playlist-add;
             primary: false;
-            compact: root.width < 640px;
+            compact: Theme.compact || root.width < 640px;
             clicked => { App.open-dialog(4); }
         }
         PillButton {
             text: "Clear";
             d: Icons.trash;
             primary: false;
+            compact: Theme.compact;
             clicked => { App.queue-clear(); }
         }
     }
@@ -281,20 +333,20 @@ export component QueuePage inherits Rectangle {
 }
 
 export component AlbumDetailPage inherits Rectangle {
-    property <length> head: 232px;
+    property <length> head: Theme.compact ? 238px : 232px;
 
     IconButton {
-        x: 14px;
-        y: 14px;
+        x: Theme.compact ? 2px : 14px;
+        y: Theme.compact ? 6px : 14px;
         d: Icons.chevron-left;
         label: "Back to albums";
         clicked => { App.show-page(1); }
     }
     Cover {
-        x: 36px;
-        y: 52px;
-        width: 156px;
-        height: 156px;
+        x: Theme.compact ? 16px : 36px;
+        y: Theme.compact ? 56px : 52px;
+        width: Theme.compact ? 116px : 156px;
+        height: self.width;
         art: App.detail-art;
         has-art: App.detail-has-art;
         seed: App.detail-seed;
@@ -302,23 +354,23 @@ export component AlbumDetailPage inherits Rectangle {
         shadow: true;
     }
     VerticalLayout {
-        x: 216px;
-        y: 52px;
-        width: parent.width - 216px - 28px;
-        height: 156px;
+        x: Theme.compact ? 144px : 216px;
+        y: Theme.compact ? 56px : 52px;
+        width: parent.width - self.x - (Theme.compact ? 16px : 28px);
+        height: Theme.compact ? 116px : 156px;
         alignment: center;
         spacing: 4px;
         Text {
             text: App.detail-title;
             font-family: Theme.title-font;
-            font-size: 30px;
+            font-size: Theme.compact ? 22px : 30px;
             font-weight: 700;
             color: Theme.text;
             overflow: elide;
         }
         Text {
             text: App.detail-artist;
-            font-size: 18px;
+            font-size: Theme.compact ? 16px : 18px;
             font-weight: 600;
             color: Theme.accent-text;
             overflow: elide;
@@ -329,10 +381,10 @@ export component AlbumDetailPage inherits Rectangle {
             color: Theme.text-2;
             overflow: elide;
         }
-        Rectangle {
+        if !Theme.compact: Rectangle {
             height: 10px;
         }
-        HorizontalLayout {
+        if !Theme.compact: HorizontalLayout {
             spacing: 10px;
             alignment: start;
             height: 36px;
@@ -347,6 +399,26 @@ export component AlbumDetailPage inherits Rectangle {
                 primary: false;
                 clicked => { App.play-all(true); }
             }
+        }
+    }
+    // Narrow windows: the buttons go under the cover and the titles.
+    if Theme.compact: HorizontalLayout {
+        x: 16px;
+        y: 182px;
+        width: parent.width - 32px;
+        height: 44px;
+        spacing: 10px;
+        alignment: start;
+        PillButton {
+            text: "Play";
+            d: Icons.play;
+            clicked => { App.play-all(false); }
+        }
+        PillButton {
+            text: "Shuffle";
+            d: Icons.shuffle;
+            primary: false;
+            clicked => { App.play-all(true); }
         }
     }
     Rectangle {
@@ -366,16 +438,57 @@ export component AlbumDetailPage inherits Rectangle {
             play-next => { App.play-next-row(i); }
             enqueue => { App.enqueue-row(i); }
             add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+            more => {
+                App.sheet-removable = false;
+                App.sheet-row = i;
+            }
         }
     }
 }
 
+/// The playlists, one per row: what the sidebar lists on wide windows.
+export component PlaylistsPage inherits Rectangle {
+    property <length> head: 64px;
+    PageHeader {
+        y: 0px;
+        title: "Playlists";
+        subtitle: App.playlists.length == 1 ? "1 playlist" : App.playlists.length + " playlists";
+        PillButton {
+            text: "New";
+            d: Icons.add;
+            clicked => { App.open-dialog(1); }
+        }
+    }
+    Rectangle {
+        y: root.head - 2px;
+        height: 1px;
+        background: Theme.line;
+    }
+    ListView {
+        y: root.head;
+        height: parent.height - root.head;
+        for name[i] in App.playlists: PlaylistItem {
+            name: name;
+            open => { App.open-playlist(i); }
+        }
+    }
+    if App.playlists.length == 0: EmptyState {
+        y: root.head + 40px;
+        height: 220px;
+        icon: Icons.playlist;
+        title: "No playlists yet";
+        detail: "Tap New, or use a song's menu to add it to a new playlist.";
+    }
+}
+
 export component PlaylistPage inherits Rectangle {
-    property <length> head: 100px;
+    property <length> head: Theme.compact ? 64px : 100px;
     PageHeader {
         y: 0px;
         title: App.playlist-title;
         subtitle: App.playlist-subtitle;
+        back: Theme.compact;
+        go-back => { App.show-page(8); }
         IconButton {
             d: Icons.edit;
             label: "Rename playlist";
@@ -392,13 +505,13 @@ export component PlaylistPage inherits Rectangle {
             text: "Shuffle";
             d: Icons.shuffle;
             primary: false;
-            compact: root.width < 760px;
+            compact: Theme.compact || root.width < 760px;
             clicked => { App.play-all(true); }
         }
         PillButton {
             text: "Play";
             d: Icons.play;
-            compact: root.width < 760px;
+            compact: Theme.compact || root.width < 760px;
             clicked => { App.play-all(false); }
         }
     }
@@ -421,6 +534,10 @@ export component PlaylistPage inherits Rectangle {
             enqueue => { App.enqueue-row(i); }
             remove => { App.playlist-remove-row(i); }
             add-to-playlist(x, y) => { App.playlist-menu(i, x, y); }
+            more => {
+                App.sheet-removable = true;
+                App.sheet-row = i;
+            }
         }
     }
     if App.tracks.length == 0: EmptyState {
@@ -456,33 +573,33 @@ component CountBadge inherits Rectangle {
 /// Songs whose tags leave out an artist, a real title or a cover, each highlighted. Opening one
 /// starts the lookup in the track editor; nothing about a song changes until it is saved there.
 export component UnidentifiedPage inherits Rectangle {
-    property <length> head: 112px;
+    property <length> head: Theme.compact ? 140px : 112px;
     IconButton {
-        x: 14px;
-        y: 14px;
+        x: Theme.compact ? 2px : 14px;
+        y: Theme.compact ? 6px : 14px;
         d: Icons.chevron-left;
         label: "Back to settings";
         clicked => { App.show-page(4); }
     }
     heading := Text {
-        x: 60px;
-        y: 16px;
+        x: Theme.compact ? 52px : 60px;
+        y: Theme.compact ? 10px : 16px;
         text: "Unidentified tracks";
         font-family: Theme.title-font;
-        font-size: 30px;
+        font-size: Theme.compact ? 24px : 30px;
         font-weight: 700;
         color: Theme.text;
     }
     if App.flagged-count > 0: CountBadge {
-        x: heading.x + heading.preferred-width + 14px;
-        y: 24px;
+        x: Theme.compact ? 18px : heading.x + heading.preferred-width + 14px;
+        y: Theme.compact ? 52px : 24px;
         text: App.flagged-text;
     }
     Text {
-        x: 62px;
-        y: 60px;
-        width: parent.width - 62px - 28px;
-        height: 40px;
+        x: Theme.compact ? 16px : 62px;
+        y: Theme.compact ? 82px : 60px;
+        width: parent.width - self.x - (Theme.compact ? 16px : 28px);
+        height: Theme.compact ? 52px : 40px;
         text: "Tap a song to look it up online and fill in its tags, cover and lyrics. You see everything before anything is saved.";
         font-size: 13px;
         color: Theme.text-2;
@@ -550,11 +667,18 @@ component SettingsCard inherits Rectangle {
 component SettingsRow inherits Rectangle {
     in property <string> label;
     in property <string> detail;
-    height: 58px;
+    /// The control is wide (a bar of choices, a slider, a text box): narrow windows give it a line of
+    /// its own under the label instead of the right half.
+    in property <bool> stack: false;
+    /// There is no control: the text may use the whole row.
+    in property <bool> text-only: false;
+    private property <bool> stacked: root.stack && Theme.compact;
+    private property <length> text-w: root.stacked || root.text-only ? root.width - 28px : root.width * 0.5 - 14px;
+    height: root.stacked ? 106px : 58px;
     Text {
         x: 14px;
-        y: root.detail != "" ? 10px : (parent.height - self.height) / 2;
-        width: parent.width * 0.5 - 14px;
+        y: root.detail != "" ? 10px : (58px - self.height) / 2;
+        width: root.text-w;
         text: root.label;
         font-size: 15px;
         font-weight: 500;
@@ -564,7 +688,7 @@ component SettingsRow inherits Rectangle {
     if root.detail != "": Text {
         x: 14px;
         y: 31px;
-        width: parent.width * 0.5 - 14px;
+        width: root.text-w;
         text: root.detail;
         font-size: 12px;
         color: Theme.text-3;
@@ -572,12 +696,12 @@ component SettingsRow inherits Rectangle {
     }
     // Controls are right-aligned; each one centres itself with `y: (parent.height - self.height) / 2`.
     HorizontalLayout {
-        x: parent.width * 0.5;
-        y: 0px;
-        width: parent.width * 0.5 - 14px;
-        height: parent.height;
-        alignment: end;
-        spacing: 8px;
+        x: root.stacked ? 14px : parent.width * 0.5;
+        y: root.stacked ? 56px : 0px;
+        width: root.stacked ? parent.width - 28px : parent.width * 0.5 - 14px;
+        height: root.stacked ? 44px : 58px;
+        alignment: root.stacked ? LayoutAlignment.start : LayoutAlignment.end;
+        spacing: root.stacked && Theme.compact ? 5px : 8px;
         @children
     }
 }
@@ -592,9 +716,9 @@ component Swatch inherits Rectangle {
     in property <bool> selected;
     in property <string> label;
     callback clicked();
-    width: 26px;
-    height: 26px;
-    border-radius: 13px * Theme.circle;
+    width: Theme.touch ? 28px : 26px;
+    height: self.width;
+    border-radius: self.width / 2 * Theme.circle;
     background: root.c;
     border-width: root.selected ? 3px : 1px;
     border-color: root.selected ? Theme.text : Theme.line;
@@ -711,8 +835,8 @@ component ThemeTile inherits Rectangle {
 component ThemeGallery inherits Rectangle {
     property <length> gap: 14px;
     property <length> pad: 12px;
-    // As many columns as fit tiles of at least 150px, then the tiles share the row evenly.
-    property <int> cols: max(1, floor((self.width - 2 * root.pad + root.gap) / (150px + root.gap)));
+    // As many columns as fit tiles of at least 150px (128px when narrow), then the tiles share the row evenly.
+    property <int> cols: max(1, floor((self.width - 2 * root.pad + root.gap) / ((Theme.compact ? 128px : 150px) + root.gap)));
     property <length> tile-w: (self.width - 2 * root.pad - (root.cols - 1) * root.gap) / root.cols;
     height: col.preferred-height;
     col := VerticalLayout {
@@ -747,24 +871,24 @@ component ThemeGallery inherits Rectangle {
 
 export component SettingsPage inherits Rectangle {
     Text {
-        x: 28px;
-        y: 22px;
+        x: Theme.compact ? 16px : 28px;
+        y: Theme.compact ? 10px : 22px;
         text: "Settings";
         font-family: Theme.title-font;
-        font-size: 34px;
+        font-size: Theme.compact ? 26px : 34px;
         font-weight: 700;
         color: Theme.text;
     }
     Flickable {
-        y: 84px;
-        height: parent.height - 84px;
+        y: Theme.compact ? 56px : 84px;
+        height: parent.height - self.y;
         mouse-drag-pan-enabled: false;
         VerticalLayout {
             width: parent.width;
-            padding-left: 28px;
-            padding-right: 28px;
+            padding-left: Theme.compact ? 12px : 28px;
+            padding-right: Theme.compact ? 12px : 28px;
             padding-bottom: 36px;
-            spacing: 18px;
+            spacing: Theme.compact ? 14px : 18px;
 
             SettingsCard {
                 heading: "THEME";
@@ -776,15 +900,16 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "Accent color";
                     detail: App.accent-hint;
+                    stack: true;
                     HorizontalLayout {
-                        spacing: 8px;
-                        alignment: end;
-                        height: 26px;
+                        spacing: Theme.compact ? 5px : 8px;
+                        alignment: Theme.compact ? LayoutAlignment.start : LayoutAlignment.end;
+                        height: Theme.touch ? 28px : 26px;
                         y: (parent.height - self.height) / 2;
                         Rectangle {
-                            width: 26px;
-                            height: 26px;
-                            border-radius: 13px * Theme.circle;
+                            width: Theme.touch ? 28px : 26px;
+                            height: self.width;
+                            border-radius: self.width / 2 * Theme.circle;
                             background: @conic-gradient(#fa2d48 0deg, #f2b632 90deg, #2fc467 150deg, #2fb5c8 210deg, #4f7cff 270deg, #bf5af2 320deg, #fa2d48 360deg);
                             border-width: App.accent-index == 0 ? 3px : 1px;
                             border-color: App.accent-index == 0 ? Theme.text : Theme.line;
@@ -811,7 +936,7 @@ export component SettingsPage inherits Rectangle {
                     detail: "A hex color such as #ff3b8d";
                     Rectangle {
                         width: 118px;
-                        height: 32px;
+                        height: Theme.touch ? 40px : 32px;
                         y: (parent.height - self.height) / 2;
                         border-radius: 9px * Theme.rounding;
                         background: Theme.hover;
@@ -847,8 +972,9 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "Density";
                     detail: "Row height in lists";
+                    stack: true;
                     Segmented {
-                        width: 300px;
+                        width: Theme.compact ? parent.width : 300px;
                         y: (parent.height - self.height) / 2;
                         items: ["Compact", "Comfortable", "Spacious"];
                         current: App.density-index;
@@ -856,18 +982,20 @@ export component SettingsPage inherits Rectangle {
                     }
                 }
                 Divider { }
-                SettingsRow {
+                // A phone's screen is already scaled to its size by Android.
+                if !Theme.touch-screen: SettingsRow {
                     label: "Interface size";
                     detail: App.restart-needed ? "Restart Wisp to apply" : "Scales the whole interface";
+                    stack: true;
                     Segmented {
-                        width: 330px;
+                        width: Theme.compact ? parent.width : 330px;
                         y: (parent.height - self.height) / 2;
                         items: ["90%", "100%", "110%", "125%", "150%"];
                         current: App.scale-index;
                         selected(i) => { App.set-scale(i); }
                     }
                 }
-                Divider { }
+                if !Theme.touch-screen: Divider { }
                 SettingsRow {
                     label: "Ambient backdrop";
                     detail: App.backdrop-locked ? "Not used by the " + App.theme-name + " theme" : "Blurred album art behind the interface";
@@ -885,8 +1013,9 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "Volume normalization";
                     detail: "ReplayGain tags, when present";
+                    stack: true;
                     Segmented {
-                        width: 230px;
+                        width: Theme.compact ? parent.width : 230px;
                         y: (parent.height - self.height) / 2;
                         items: ["Off", "Track", "Album"];
                         current: App.norm-index;
@@ -897,6 +1026,7 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "Pre-amp";
                     detail: App.norm-index == 0 ? "Turn normalization on to use it" : "Applied on top of ReplayGain";
+                    stack: true;
                     Text {
                         width: 64px;
                         y: 0px;
@@ -908,7 +1038,7 @@ export component SettingsPage inherits Rectangle {
                         vertical-alignment: center;
                     }
                     Slider {
-                        width: 150px;
+                        width: Theme.compact ? parent.width - 69px : 150px;
                         y: (parent.height - self.height) / 2;
                         enabled: App.norm-index != 0;
                         label: "Pre-amp";
@@ -985,7 +1115,8 @@ export component SettingsPage inherits Rectangle {
                         y: (parent.height - self.height) / 2;
                         clicked => { App.rescan(); }
                     }
-                    PillButton {
+                    // There is no folder picker on a phone: it reads the shared Music folder.
+                    if !Theme.touch-screen: PillButton {
                         text: "Add folder";
                         d: Icons.add;
                         y: (parent.height - self.height) / 2;
@@ -1019,6 +1150,7 @@ export component SettingsPage inherits Rectangle {
                         size: 30px;
                         glyph: 16px;
                         tint: Theme.text-2;
+                        visible: !Theme.touch-screen;
                         clicked => { App.remove-folder(i); }
                     }
                 }
@@ -1037,6 +1169,7 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "Unidentified tracks";
                     detail: App.flagged-count == 0 ? "Every song has an artist, a title and a cover" : "Missing an artist, a real title or a cover";
+                    stack: true;
                     if App.flagged-count > 0: CountBadge {
                         y: (parent.height - self.height) / 2;
                         text: App.flagged-text;
@@ -1052,9 +1185,10 @@ export component SettingsPage inherits Rectangle {
                 SettingsRow {
                     label: "MusicBrainz contact";
                     detail: "Your email or website, sent with lookups as MusicBrainz asks";
+                    stack: true;
                     Rectangle {
-                        width: 230px;
-                        height: 32px;
+                        width: Theme.compact ? parent.width : 230px;
+                        height: Theme.touch ? 40px : 32px;
                         y: (parent.height - self.height) / 2;
                         border-radius: 9px * Theme.rounding;
                         background: Theme.hover;
@@ -1095,21 +1229,25 @@ export component SettingsPage inherits Rectangle {
                 heading: "ABOUT";
                 SettingsRow {
                     label: "Wisp Player";
-                    detail: "Gapless audio player. Built with Rust, Slint, Symphonia, cpal, rubato and redb.";
+                    text-only: true;
+                    detail: "Gapless audio player, built with Rust and Slint.";
                 }
                 Divider { }
                 SettingsRow {
                     label: "Made by Claude";
-                    detail: "Designed and written by Claude, an AI model by Anthropic.";
+                    text-only: true;
+                    detail: "Written by Claude, an AI model by Anthropic.";
                 }
                 Divider { }
                 SettingsRow {
                     label: "Free software, GNU GPL v3";
+                    text-only: true;
                     detail: "You may share and change it. No warranty.";
                 }
                 Divider { }
                 SettingsRow {
                     label: "Source code";
+                    text-only: true;
                     detail: "github.com/DividedsWhimsicalVHS/WispPlayer";
                 }
                 Rectangle {

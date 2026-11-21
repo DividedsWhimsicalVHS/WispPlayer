@@ -4,10 +4,17 @@
 // are the Wisp dark theme, so a window shown before a theme was applied still looks right.
 
 export global Theme {
+    // -- the screen
+    /// The window is narrow (a phone held upright, a thin window): tabs along the bottom, a mini
+    /// player, one pane at a time. Set by the window from its width.
+    in-out property <bool> compact: false;
+    /// The platform has a touch screen and nothing to hover with (set once at startup).
+    in property <bool> touch-screen: false;
+    /// Fingers, not a mouse: nothing waits for a hover, targets are bigger, a tap is enough where a
+    /// mouse double-clicks.
+    out property <bool> touch: touch-screen || compact;
+
     // -- settings
-    /// The screen is touched, not pointed at: nothing waits for a hover, targets are bigger, a tap
-    /// is enough where a mouse double-clicks. Set once at startup, by the platform.
-    in-out property <bool> touch: false;
     /// 0 = compact, 1 = comfortable, 2 = spacious
     in-out property <int> density: 1;
     in-out property <bool> backdrop-on: true;
@@ -102,5 +109,6 @@ export global Icons {
     out property <string> playlist: "M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z";
     out property <string> playlist-add: "M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z";
     out property <string> edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
-    out property <string> magic: "M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z";
+    out property <string> more: "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z";
+    out property <string> magic:"M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z";
 }

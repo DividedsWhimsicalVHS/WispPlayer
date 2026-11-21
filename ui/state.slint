@@ -2,6 +2,7 @@
 // every component just reads `App.*`, so nothing needs to be forwarded through layers.
 
 import { TrackRow, QueueRow, AlbumData, ArtistData, LyricLine, DeviceRow, ResultRow, ThemeGroup } from "types.slint";
+import { Theme } from "theme.slint";
 
 export global App {
     // -- navigation: 0 songs, 1 albums, 2 artists, 3 queue, 4 settings, 5 album detail,
@@ -11,9 +12,6 @@ export global App {
     in-out property <bool> np-open: false;
     /// Now playing: 0 lyrics, 1 up next, -1 the player itself (narrow windows only).
     in-out property <int> np-tab: 0;
-    /// The window is narrow (a phone held upright): tabs along the bottom, a mini player, one pane
-    /// at a time. Set by the window from its own width.
-    in-out property <bool> compact: false;
     /// The row of `tracks` whose action sheet is open (narrow windows), or -1.
     in-out property <int> sheet-row: -1;
     /// That row belongs to a playlist, so it can also be taken out of it.
@@ -126,6 +124,8 @@ export global App {
 
     // -- the track editor (a modal over everything)
     in-out property <bool> ed-open: false;
+    /// Narrow windows show one step at a time: 0 the search and its matches, 1 the fields.
+    in-out property <int> ed-step: 0;
     in-out property <string> ed-file: "";
     in-out property <string> ed-reason: "";
     /// What saving does for this kind of file.
@@ -188,7 +188,7 @@ export global App {
             show-page(4);
             return true;
         }
-        if (page == 6 && compact) {
+        if (page == 6 && Theme.compact) {
             show-page(8);
             return true;
         }

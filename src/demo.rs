@@ -103,9 +103,13 @@ const LYRICS: [&str; 14] = [
     "Of a confession, whispered low",
 ];
 
-pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str) {
+pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str, phone: bool, width: u32) {
     let app = ui.global::<App>();
     let theme = ui.global::<Theme>();
+    // The window sets `compact` itself once it has its size; set here too so the first frame is right.
+    let compact = width < 840;
+    theme.set_touch_screen(phone);
+    theme.set_compact(compact);
 
     // Now playing.
     let art = make_art(5, 512);
@@ -224,6 +228,13 @@ pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str) {
     app.set_norm_index(1);
     app.set_preamp(1.5);
 
+    // Playlists.
+    let names = ["Road trip", "Late night", "Gym", "Focus", "Sunday morning"];
+    app.set_playlists(ModelRc::new(VecModel::from(names.iter().map(|n| SharedString::from(*n)).collect::<Vec<_>>())));
+    app.set_playlist_index(0);
+    app.set_playlist_title("Road trip".into());
+    app.set_playlist_subtitle("18 songs · 1 hr 12 min".into());
+
     // Unidentified songs, and the track editor open on the first of them.
     let unidentified: [(&str, &str, i32); 9] = [
         ("AUDIO_294", "Unknown Artist", 7),
@@ -252,7 +263,7 @@ pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str) {
     app.set_flagged(ModelRc::new(VecModel::from(flagged)));
     app.set_flagged_count(14);
     app.set_flagged_text("14 Unidentified".into());
-    if scene == "editor" {
+    if scene == "editor" || scene == "editor-fields" {
         let matches: [(&str, &str, &str, &str, bool, i32); 5] = [
             ("Flashing Lights", "Kanye West feat. Dwele", "Graduation · 2007 · Track 9", "", true, 2),
             ("Flashing Lights", "Kanye West feat. Dwele", "Graduation (Deluxe) · 2007 · Track 9", "", true, 2),
@@ -293,6 +304,7 @@ pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str) {
         app.set_ed_lyrics("[00:12.30] Something in the way you move\n[00:16.10] Makes me feel like I can't live without you\n[00:20.00] It takes me all the way\n[00:23.50] I want you to stay".into());
         app.set_ed_lyrics_note("Synced lyrics from LRCLIB".into());
         app.set_ed_lyrics_avail(3);
+        app.set_ed_step(if scene == "editor-fields" { 1 } else { 0 });
     }
 
     let page = match scene {
@@ -301,12 +313,33 @@ pub fn populate(ui: &MainWindow, scene: &str, theme_id: &str) {
         "queue" => 3,
         "settings" => 4,
         "detail" => 5,
-        "unidentified" | "editor" => 7,
+        "playlist" => 6,
+        "unidentified" | "editor" | "editor-fields" => 7,
+        "playlists" => 8,
         _ => 0,
     };
     app.set_page(page);
-    app.set_np_open(scene == "np" || scene == "np-queue");
-    app.set_np_tab(if scene == "np-queue" { 1 } else { 0 });
+    app.set_np_open(matches!(scene, "np" | "np-lyrics" | "np-queue"));
+    // A narrow window's "np" is the player itself (-1); a wide one has no such view and shows the lyrics.
+    app.set_np_tab(match scene {
+        "np-queue" => 1,
+        "np" if compact => -1,
+        _ => 0,
+    });
+    if scene == "sheet" {
+        app.set_sheet_row(2);
+    }
+    if scene == "sheet-playlist" {
+        app.set_page(6);
+        app.set_sheet_row(2);
+        app.set_sheet_removable(true);
+    }
+    if scene == "menu" {
+        app.set_menu_open(true);
+    }
+    if scene == "dialog" {
+        app.set_dialog(1);
+    }
     if scene == "toast" {
         app.set_toast("Added to queue".into());
     }

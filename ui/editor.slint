@@ -13,7 +13,7 @@ component Field inherits Rectangle {
     in property <string> placeholder;
     in property <bool> numeric: false;
     in-out property <string> text <=> input.text;
-    height: 56px;
+    height: Theme.touch ? 66px : 56px;
 
     Text {
         x: 2px;
@@ -25,7 +25,7 @@ component Field inherits Rectangle {
     }
     Rectangle {
         y: 20px;
-        height: 34px;
+        height: Theme.touch ? 42px : 34px;
         border-radius: 9px * Theme.rounding;
         background: Theme.hover;
         border-width: Theme.border-w;
@@ -58,7 +58,7 @@ component Field inherits Rectangle {
 component MiniButton inherits Rectangle {
     in property <string> text;
     callback clicked();
-    height: 28px;
+    height: Theme.touch ? 36px : 28px;
     width: label.preferred-width + 24px;
     border-radius: 8px * Theme.rounding;
     background: ta.pressed ? Theme.press : ta.has-hover ? Theme.surface-hi : Theme.surface;
@@ -191,7 +191,73 @@ component ResultItem inherits Rectangle {
     }
 }
 
+/// The lyrics as editable text in a scrolling box, with a marker for how far it is scrolled.
+component LyricsBox inherits Rectangle {
+    private property <int> serial: App.ed-lyrics-serial;
+    border-radius: 9px * Theme.rounding;
+    background: Theme.hover;
+    border-width: Theme.border-w;
+    border-color: lyrics.has-focus ? Theme.accent : Theme.line;
+    clip: true;
+    animate border-color { duration: 120ms; }
+
+    fl := Flickable {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        content-height: max(self.height, lyrics.preferred-height + 20px);
+        lyrics := TextInput {
+            x: 10px;
+            y: 10px;
+            width: parent.width - 20px - 6px;
+            text <=> App.ed-lyrics;
+            font-size: 13px;
+            color: Theme.text;
+            selection-background-color: Theme.accent.with-alpha(0.45);
+            selection-foreground-color: Theme.text;
+            single-line: false;
+            wrap: word-wrap;
+            accessible-role: text-input;
+            accessible-label: "Lyrics";
+            cursor-position-changed(pos) => {
+                // Keep the caret in view while typing or moving through the text.
+                if (pos.y + self.y + fl.content-y < 4px) {
+                    fl.content-y = min(0px, 4px - (pos.y + self.y));
+                } else if (pos.y + self.y + 20px + fl.content-y > fl.height - 4px) {
+                    fl.content-y = fl.height - 4px - (pos.y + self.y + 20px);
+                }
+            }
+        }
+    }
+    if lyrics.text == "": Text {
+        x: 10px;
+        y: 10px;
+        width: parent.width - 20px;
+        text: "Pick a match to fetch its lyrics, or paste your own here.";
+        font-size: 13px;
+        color: Theme.text-3;
+        wrap: word-wrap;
+    }
+    // A scroll position marker for long lyrics.
+    if fl.content-height > fl.height + 1px: Rectangle {
+        x: parent.width - 7px;
+        width: 3px;
+        height: max(24px, parent.height * fl.height / fl.content-height);
+        y: (parent.height - self.height) * min(1, max(0, -fl.content-y / (fl.content-height - fl.height)));
+        border-radius: 1.5px;
+        background: Theme.thumb;
+        opacity: 0.7;
+    }
+
+    changed serial => { fl.content-y = 0px; }
+}
+
 export component TagEditor inherits Rectangle {
+    /// Narrow windows: the room the system keeps free at the top and bottom, and the on-screen keyboard.
+    in property <length> inset-top: 0px;
+    in property <length> inset-bottom: 0px;
+    in property <length> keyboard: 0px;
     background: #000000a8;
 
     private property <length> head: 78px;
@@ -200,14 +266,20 @@ export component TagEditor inherits Rectangle {
     /// Left edge and width of the fields on the right.
     private property <length> rx: root.left-w + 24px;
     private property <length> rw: panel.width - root.left-w - 48px;
-    private property <int> lyrics-serial: App.ed-lyrics-serial;
 
-    init => { search.focus-field(); }
+    // (A touch screen's keyboard would cover half the window the moment the editor opens.)
+    init => {
+        if (!Theme.touch) {
+            search.focus-field();
+        }
+    }
 
     // A click outside the panel does nothing: it must not throw away what was typed.
     TouchArea { }
 
+    // -- wide windows: the search on the left, the fields on the right
     panel := Rectangle {
+        visible: !Theme.compact;
         width: min(940px, root.width - 48px);
         height: min(700px, root.height - 40px);
         x: (root.width - self.width) / 2;
@@ -427,65 +499,11 @@ export component TagEditor inherits Rectangle {
             current: App.ed-lyrics-mode;
             selected(i) => { App.ed-lyrics-mode-picked(i); }
         }
-        Rectangle {
+        LyricsBox {
             x: root.rx;
             y: root.head + 282px;
             width: root.rw;
             height: parent.height - root.head - 282px - root.foot - 14px;
-            border-radius: 9px * Theme.rounding;
-            background: Theme.hover;
-            border-width: Theme.border-w;
-            border-color: lyrics.has-focus ? Theme.accent : Theme.line;
-            clip: true;
-            animate border-color { duration: 120ms; }
-            fl := Flickable {
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: parent.height;
-                content-height: max(self.height, lyrics.preferred-height + 20px);
-                lyrics := TextInput {
-                    x: 10px;
-                    y: 10px;
-                    width: parent.width - 20px - 6px;
-                    text <=> App.ed-lyrics;
-                    font-size: 13px;
-                    color: Theme.text;
-                    selection-background-color: Theme.accent.with-alpha(0.45);
-                    selection-foreground-color: Theme.text;
-                    single-line: false;
-                    wrap: word-wrap;
-                    accessible-role: text-input;
-                    accessible-label: "Lyrics";
-                    cursor-position-changed(pos) => {
-                        // Keep the caret in view while typing or moving through the text.
-                        if (pos.y + self.y + fl.content-y < 4px) {
-                            fl.content-y = min(0px, 4px - (pos.y + self.y));
-                        } else if (pos.y + self.y + 20px + fl.content-y > fl.height - 4px) {
-                            fl.content-y = fl.height - 4px - (pos.y + self.y + 20px);
-                        }
-                    }
-                }
-            }
-            if lyrics.text == "": Text {
-                x: 10px;
-                y: 10px;
-                width: parent.width - 20px;
-                text: "Pick a match to fetch its lyrics, or paste your own here.";
-                font-size: 13px;
-                color: Theme.text-3;
-                wrap: word-wrap;
-            }
-            // A scroll position marker for long lyrics.
-            if fl.content-height > fl.height + 1px: Rectangle {
-                x: parent.width - 7px;
-                width: 3px;
-                height: max(24px, parent.height * fl.height / fl.content-height);
-                y: (parent.height - self.height) * min(1, max(0, -fl.content-y / (fl.content-height - fl.height)));
-                border-radius: 1.5px;
-                background: Theme.thumb;
-                opacity: 0.7;
-            }
         }
 
         // -- footer
@@ -530,5 +548,276 @@ export component TagEditor inherits Rectangle {
         }
     }
 
-    changed lyrics-serial => { fl.content-y = 0px; }
+    // -- narrow windows: the whole window, one step at a time (matches, then fields), the buttons
+    // always above the on-screen keyboard
+    if Theme.compact: Rectangle {
+        background: Theme.overlay;
+        property <length> body-y: root.inset-top + 126px;
+        property <length> foot-h: 104px;
+        property <length> foot-y: parent.height - (root.keyboard > 0px ? root.keyboard : root.inset-bottom) - self.foot-h;
+        property <length> body-h: self.foot-y - self.body-y;
+        TouchArea { }
+
+        Text {
+            x: 16px;
+            y: root.inset-top + 8px;
+            width: parent.width - 16px - 64px;
+            text: "Track lookup & tag editor";
+            font-family: Theme.title-font;
+            font-size: 18px;
+            font-weight: 700;
+            color: Theme.text;
+            overflow: elide;
+        }
+        Text {
+            x: 16px;
+            y: root.inset-top + 34px;
+            width: parent.width - 16px - 64px;
+            text: App.ed-file;
+            font-size: 13px;
+            color: Theme.text-2;
+            overflow: elide;
+        }
+        Text {
+            x: 16px;
+            y: root.inset-top + 52px;
+            width: parent.width - 16px - 64px;
+            text: App.ed-reason;
+            font-size: 12px;
+            color: Theme.accent-text;
+            overflow: elide;
+        }
+        IconButton {
+            x: parent.width - self.width - 8px;
+            y: root.inset-top + 6px;
+            d: Icons.close;
+            label: "Close";
+            clicked => { App.ed-close(); }
+        }
+        Segmented {
+            x: 16px;
+            y: root.inset-top + 78px;
+            width: parent.width - 32px;
+            items: ["Matches", "Edit"];
+            current: App.ed-step;
+            selected(i) => { App.ed-step = i; }
+        }
+
+        // -- step 0: the search and its matches
+        if App.ed-step == 0: Rectangle {
+            y: parent.body-y;
+            height: parent.body-h;
+            SearchField {
+                x: 16px;
+                y: 0px;
+                width: parent.width - 32px - find2.width - 8px;
+                height: 44px;
+                text <=> App.ed-query;
+                placeholder: "Song and artist";
+                accepted(t) => { App.ed-search(t); }
+            }
+            find2 := PillButton {
+                width: self.preferred-width;
+                x: parent.width - 16px - self.width;
+                y: 0px;
+                text: "Search";
+                clicked => { App.ed-search(App.ed-query); }
+            }
+            Text {
+                x: 20px;
+                y: 50px;
+                width: parent.width - 40px;
+                height: 30px;
+                text: App.ed-status;
+                font-size: 12px;
+                color: App.ed-problem ? Theme.danger : Theme.text-3;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+            ListView {
+                x: 0px;
+                y: 84px;
+                width: parent.width;
+                height: parent.height - 84px;
+                for r[i] in App.ed-results: ResultItem {
+                    r: r;
+                    seed: i;
+                    picked: i == App.ed-picked;
+                    pick => {
+                        App.ed-pick(i);
+                        App.ed-step = 1;
+                    }
+                }
+            }
+            if App.ed-results.length == 0 && !App.ed-busy && App.ed-status == "": Text {
+                x: 24px;
+                y: 100px;
+                width: parent.width - 48px;
+                text: "Type the song the way you would in a search engine, for example \"Flashing Lights Kanye West\", then tap Search.";
+                font-size: 13px;
+                color: Theme.text-3;
+                wrap: word-wrap;
+            }
+        }
+
+        // -- step 1: the cover, the fields and the lyrics
+        if App.ed-step == 1: Flickable {
+            y: parent.body-y;
+            height: parent.body-h;
+            content-height: 600px;
+            Cover {
+                x: 16px;
+                y: 4px;
+                width: 96px;
+                height: 96px;
+                art: App.ed-cover;
+                has-art: App.ed-has-cover;
+                seed: 5;
+                radius: 10px * Theme.rounding;
+            }
+            Text {
+                x: 16px;
+                y: 104px;
+                width: 100px;
+                height: 30px;
+                text: App.ed-cover-note;
+                font-size: 11px;
+                color: Theme.text-3;
+                wrap: word-wrap;
+            }
+            // (There is no picker for an image of your own on a phone yet.)
+            if !Theme.touch-screen: MiniButton {
+                x: 16px;
+                y: 138px;
+                text: "Choose image…";
+                clicked => { App.ed-choose-cover(); }
+            }
+            Field {
+                x: 126px;
+                y: 0px;
+                width: parent.width - 126px - 16px;
+                label: "TITLE";
+                placeholder: "Song title";
+                text <=> App.ed-title;
+            }
+            Field {
+                x: 126px;
+                y: 70px;
+                width: parent.width - 126px - 16px;
+                label: "ARTIST";
+                placeholder: "Artist";
+                text <=> App.ed-artist;
+            }
+            Field {
+                x: 126px;
+                y: 140px;
+                width: parent.width - 126px - 16px;
+                label: "ALBUM";
+                placeholder: "Album";
+                text <=> App.ed-album;
+            }
+            Field {
+                x: 16px;
+                y: 216px;
+                width: parent.width - 32px - 84px - 74px - 20px;
+                label: "ALBUM ARTIST";
+                placeholder: "Album artist";
+                text <=> App.ed-album-artist;
+            }
+            Field {
+                x: parent.width - 16px - 74px - 10px - 84px;
+                y: 216px;
+                width: 84px;
+                label: "YEAR";
+                numeric: true;
+                text <=> App.ed-year;
+            }
+            Field {
+                x: parent.width - 16px - 74px;
+                y: 216px;
+                width: 74px;
+                label: "TRACK";
+                numeric: true;
+                text <=> App.ed-track;
+            }
+            Text {
+                x: 18px;
+                y: 292px;
+                height: 26px;
+                text: "LYRICS";
+                font-size: 11px;
+                font-weight: 700;
+                color: Theme.text-3;
+                vertical-alignment: center;
+            }
+            Text {
+                x: 72px;
+                y: 292px;
+                width: parent.width - 72px - 16px - (App.ed-lyrics-avail == 3 ? 150px : 0px);
+                height: 26px;
+                text: App.ed-lyrics-note;
+                font-size: 12px;
+                color: Theme.text-3;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if App.ed-lyrics-avail == 3: Segmented {
+                x: parent.width - 16px - 140px;
+                y: 290px;
+                width: 140px;
+                height: 30px;
+                items: ["Synced", "Plain"];
+                current: App.ed-lyrics-mode;
+                selected(i) => { App.ed-lyrics-mode-picked(i); }
+            }
+            LyricsBox {
+                x: 16px;
+                y: 324px;
+                width: parent.width - 32px;
+                height: 250px;
+            }
+        }
+
+        // -- footer
+        Rectangle {
+            y: parent.foot-y;
+            height: 1px;
+            background: Theme.line;
+        }
+        Text {
+            x: 16px;
+            y: parent.foot-y + 6px;
+            width: parent.width - 32px;
+            height: 40px;
+            text: App.ed-error != "" ? App.ed-error : App.ed-where;
+            font-size: 12px;
+            color: App.ed-error != "" ? Theme.danger : Theme.text-3;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            x: 16px;
+            y: parent.foot-y + 50px;
+            width: parent.width - 32px;
+            height: 44px;
+            spacing: 10px;
+            alignment: end;
+            PillButton {
+                text: "Cancel";
+                primary: false;
+                clicked => { App.ed-close(); }
+            }
+            PillButton {
+                text: App.ed-saving ? "Saving…" : "Save";
+                d: Icons.check;
+                opacity: App.ed-saving || App.ed-cover-busy ? 0.45 : 1;
+                clicked => {
+                    if (!App.ed-saving && !App.ed-cover-busy) {
+                        App.ed-save();
+                    }
+                }
+            }
+        }
+    }
 }

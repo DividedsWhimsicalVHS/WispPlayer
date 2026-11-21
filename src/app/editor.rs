@@ -176,6 +176,7 @@ pub fn open(ctl: &Ctl, row: usize) {
     app.set_ed_lyrics_mode(0);
     app.set_ed_saving(false);
     app.set_ed_error(SharedString::new());
+    app.set_ed_step(0);
     app.set_ed_open(true);
     {
         let mut c = ctl.borrow_mut();

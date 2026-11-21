@@ -19,20 +19,29 @@ export component SongRow inherits Rectangle {
     callback remove();
     /// Opens the playlist menu at this window position.
     callback add-to-playlist(length, length);
+    /// Touch screens: opens the sheet with this song's actions (nothing shows on hover there).
+    callback more();
     out property <bool> hovered: ta.has-hover || lead-ta.has-hover || b-pl.hovered || b-next.hovered || b-add.hovered || b-del.hovered;
 
-    private property <length> pad: 24px;
+    private property <length> pad: Theme.touch ? 16px : 24px;
     private property <length> gap: 12px;
-    private property <length> lead-w: 28px;
+    /// The number / play cell. Touch screens go without it: a tap anywhere on the row plays.
+    private property <length> lead-w: Theme.touch ? 0px : 28px;
+    private property <length> lead-x: root.lead-w > 0px ? root.lead-w + root.gap : 0px;
     private property <length> act-w: root.removable ? 142px : 106px;
-    private property <length> dur-w: 52px;
+    private property <length> dur-w: Theme.touch ? 48px : 52px;
+    /// Touch screens: the right edge holds the duration and then the 44 px "more" button.
+    private property <length> more-w: 52px;
     /// Space shared by the title and album columns.
-    private property <length> flex: max(120px, root.width - 2 * root.pad - root.lead-w - root.act-w - root.dur-w - (root.show-album ? 4 : 3) * root.gap);
-    private property <length> title-x: root.pad + root.lead-w + root.gap;
+    private property <length> flex: Theme.touch
+        ? max(100px, root.width - root.pad - root.more-w - root.dur-w - root.gap)
+        : max(120px, root.width - 2 * root.pad - root.lead-x - root.act-w - root.dur-w - (root.show-album ? 3 : 2) * root.gap);
+    private property <length> title-x: root.pad + root.lead-x;
     private property <length> title-w: root.show-album ? root.flex * 0.58 : root.flex;
     private property <length> album-x: root.title-x + root.title-w + root.gap;
     private property <length> album-w: root.flex - root.title-w;
     private property <length> act-x: root.width - root.pad - root.dur-w - root.gap - root.act-w;
+    private property <length> dur-x: Theme.touch ? root.width - root.more-w - root.dur-w : root.width - root.pad - root.dur-w;
 
     height: Theme.row-h;
 
@@ -42,7 +51,7 @@ export component SongRow inherits Rectangle {
         width: parent.width - 16px;
         height: parent.height - 2px;
         border-radius: 10px * Theme.rounding;
-        background: root.current ? Theme.accent.with-alpha(0.15) : root.hovered ? Theme.hover : transparent;
+        background: root.current ? Theme.accent.with-alpha(0.15) : ta.pressed ? Theme.press : root.hovered ? Theme.hover : transparent;
         animate background { duration: 100ms; }
     }
     ta := TouchArea {
@@ -50,6 +59,12 @@ export component SongRow inherits Rectangle {
         accessible-label: root.track.title + ", " + root.track.artist;
         accessible-action-default => { root.play(); }
         double-clicked => { root.play(); }
+        // A finger has no double click: one tap plays. (Dragging to scroll cancels the tap.)
+        clicked => {
+            if (Theme.touch) {
+                root.play();
+            }
+        }
     }
     // leading cell: track number, now-playing marker, or a play button on hover
     Rectangle {
@@ -57,6 +72,7 @@ export component SongRow inherits Rectangle {
         y: 0px;
         width: root.lead-w;
         height: parent.height;
+        clip: true;
         if root.hovered: Icon {
             d: root.current && root.playing ? Icons.pause : Icons.play;
             width: 20px;
@@ -132,7 +148,7 @@ export component SongRow inherits Rectangle {
         x: root.act-x;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
-        visible: root.hovered;
+        visible: root.hovered && !Theme.touch;
         clicked => { root.add-to-playlist(self.absolute-position.x, self.absolute-position.y + self.height); }
     }
     b-next := IconButton {
@@ -143,7 +159,7 @@ export component SongRow inherits Rectangle {
         x: root.act-x + 36px;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
-        visible: root.hovered;
+        visible: root.hovered && !Theme.touch;
         clicked => { root.play-next(); }
     }
     b-add := IconButton {
@@ -154,7 +170,7 @@ export component SongRow inherits Rectangle {
         x: root.act-x + 72px;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
-        visible: root.hovered;
+        visible: root.hovered && !Theme.touch;
         clicked => { root.enqueue(); }
     }
     b-del := IconButton {
@@ -165,11 +181,21 @@ export component SongRow inherits Rectangle {
         x: root.act-x + 108px;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
-        visible: root.removable && root.hovered;
+        visible: root.removable && root.hovered && !Theme.touch;
         clicked => { root.remove(); }
     }
+    if Theme.touch: IconButton {
+        d: Icons.more;
+        label: "More about " + root.track.title;
+        size: 44px;
+        glyph: 22px;
+        x: root.width - 8px - self.width;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+        clicked => { root.more(); }
+    }
     Text {
-        x: root.width - root.pad - root.dur-w;
+        x: root.dur-x;
         y: 0px;
         width: root.dur-w;
         height: parent.height;
@@ -189,11 +215,14 @@ export component QueueItem inherits Rectangle {
     callback remove();
     out property <bool> hovered: ta.has-hover || lead-ta.has-hover || b-del.hovered;
 
-    private property <length> pad: 24px;
+    private property <length> pad: Theme.touch ? 16px : 24px;
     private property <length> gap: 12px;
-    private property <length> lead-w: 28px;
-    private property <length> dur-w: 52px;
-    private property <length> del-w: 32px;
+    private property <length> lead-w: Theme.touch ? 0px : 28px;
+    private property <length> lead-x: root.lead-w > 0px ? root.lead-w + root.gap : 0px;
+    private property <length> dur-w: Theme.touch ? 48px : 52px;
+    private property <length> del-w: Theme.touch ? 44px : 32px;
+    /// Where the duration ends: touch screens put the remove button at the very edge, after it.
+    private property <length> dur-x: Theme.touch ? root.width - root.del-w - 8px - root.dur-w : root.width - root.pad - root.dur-w;
 
     height: Theme.row-h;
     Rectangle {
@@ -202,7 +231,7 @@ export component QueueItem inherits Rectangle {
         width: parent.width - 16px;
         height: parent.height - 2px;
         border-radius: 10px * Theme.rounding;
-        background: root.current ? Theme.accent.with-alpha(0.15) : root.hovered ? Theme.hover : transparent;
+        background: root.current ? Theme.accent.with-alpha(0.15) : ta.pressed ? Theme.press : root.hovered ? Theme.hover : transparent;
         animate background { duration: 100ms; }
     }
     ta := TouchArea {
@@ -210,12 +239,18 @@ export component QueueItem inherits Rectangle {
         accessible-label: root.entry.title + ", " + root.entry.artist;
         accessible-action-default => { root.play(); }
         double-clicked => { root.play(); }
+        clicked => {
+            if (Theme.touch) {
+                root.play();
+            }
+        }
     }
     Rectangle {
         x: root.pad;
         y: 0px;
         width: root.lead-w;
         height: parent.height;
+        clip: true;
         if root.current: Icon {
             d: Icons.volume-high;
             width: 18px;
@@ -238,9 +273,9 @@ export component QueueItem inherits Rectangle {
         }
     }
     VerticalLayout {
-        x: root.pad + root.lead-w + root.gap;
+        x: root.pad + root.lead-x;
         y: 0px;
-        width: max(60px, root.width - 2 * root.pad - root.lead-w - root.del-w - root.dur-w - 3 * root.gap);
+        width: max(60px, root.dur-x - root.gap - root.pad - root.lead-x - (Theme.touch ? 0px : root.del-w + root.gap));
         height: parent.height;
         alignment: center;
         spacing: 1px;
@@ -263,16 +298,16 @@ export component QueueItem inherits Rectangle {
     b-del := IconButton {
         d: Icons.close;
         label: "Remove from queue";
-        size: 32px;
+        size: root.del-w;
         glyph: 16px;
-        x: root.width - root.pad - root.dur-w - root.gap - root.del-w;
+        x: Theme.touch ? root.width - 8px - self.width : root.width - root.pad - root.dur-w - root.gap - root.del-w;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
-        visible: root.hovered && !root.current;
+        visible: (root.hovered || Theme.touch) && !root.current;
         clicked => { root.remove(); }
     }
     Text {
-        x: root.width - root.pad - root.dur-w;
+        x: root.dur-x;
         y: 0px;
         width: root.dur-w;
         height: parent.height;
@@ -316,13 +351,14 @@ export component AlbumCard inherits Rectangle {
     }
     play-btn := Rectangle {
         property <bool> hovered: play-ta.has-hover;
-        width: 40px;
-        height: 40px;
-        border-radius: 20px * Theme.circle;
+        width: Theme.touch ? 44px : 40px;
+        height: self.width;
+        border-radius: self.width / 2 * Theme.circle;
         x: parent.width - self.width - 10px;
         y: parent.width - self.height - 10px;
         background: Theme.accent;
-        opacity: ta.has-hover || play-ta.has-hover ? 1 : 0;
+        // Nothing to hover with on a touch screen, so the button is always there.
+        opacity: Theme.touch || ta.has-hover || play-ta.has-hover ? 1 : 0;
         animate opacity { duration: 120ms; }
         Icon {
             d: Icons.play;
@@ -334,7 +370,7 @@ export component AlbumCard inherits Rectangle {
         }
         play-ta := TouchArea {
             mouse-cursor: pointer;
-            enabled: ta.has-hover || self.has-hover;
+            enabled: Theme.touch || ta.has-hover || self.has-hover;
             accessible-role: button;
             accessible-label: "Play " + root.album.title;
             accessible-action-default => { root.play(); }
@@ -433,6 +469,66 @@ export component ArtistItem inherits Rectangle {
         mouse-cursor: pointer;
         accessible-role: button;
         accessible-label: root.artist.name;
+        accessible-action-default => { root.open(); }
+        clicked => { root.open(); }
+    }
+}
+
+/// A playlist in the list of playlists (narrow windows; wide ones list them in the sidebar).
+export component PlaylistItem inherits Rectangle {
+    in property <string> name;
+    callback open();
+
+    height: 64px;
+    Rectangle {
+        x: 8px;
+        y: 1px;
+        width: parent.width - 16px;
+        height: parent.height - 2px;
+        border-radius: 10px * Theme.rounding;
+        background: ta.pressed ? Theme.press : ta.has-hover ? Theme.hover : transparent;
+        animate background { duration: 100ms; }
+    }
+    Rectangle {
+        x: 16px;
+        y: (parent.height - self.height) / 2;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px * Theme.rounding;
+        background: Theme.accent.with-alpha(0.16);
+        Icon {
+            d: Icons.playlist;
+            width: 24px;
+            height: 24px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: Theme.accent;
+        }
+    }
+    Text {
+        x: 74px;
+        y: 0px;
+        width: parent.width - 74px - 52px;
+        height: parent.height;
+        text: root.name;
+        font-size: 16px;
+        font-weight: 600;
+        color: Theme.text;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    Icon {
+        d: Icons.chevron-right;
+        width: 20px;
+        height: 20px;
+        x: parent.width - 20px - self.width;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-3;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: "Open " + root.name;
         accessible-action-default => { root.open(); }
         clicked => { root.open(); }
     }

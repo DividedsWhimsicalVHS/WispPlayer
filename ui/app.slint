@@ -3,7 +3,8 @@ import { Icon, IconButton, PillButton, Segmented, SearchField, ListView, Cover }
 import { QueueItem } from "rows.slint";
 import { LyricsView } from "lyrics.slint";
 import { PlayerBar } from "bar.slint";
-import { SongsPage, AlbumsPage, ArtistsPage, QueuePage, AlbumDetailPage, SettingsPage, PlaylistPage, UnidentifiedPage } from "pages.slint";
+import { SongsPage, AlbumsPage, ArtistsPage, QueuePage, AlbumDetailPage, SettingsPage, PlaylistPage, PlaylistsPage, UnidentifiedPage } from "pages.slint";
+import { MiniPlayer, TabBar, PlayerScreen, SongSheet } from "compact.slint";
 import { TagEditor } from "editor.slint";
 import { App } from "state.slint";
 
@@ -50,22 +51,22 @@ component MenuItem inherits Rectangle {
     in property <string> text;
     in property <string> d;
     callback clicked();
-    height: 36px;
+    height: Theme.touch ? 52px : 36px;
     border-radius: 8px * Theme.rounding;
     background: ta.pressed ? Theme.press : ta.has-hover ? Theme.hover : transparent;
     Icon {
         d: root.d;
-        width: 18px;
-        height: 18px;
-        x: 10px;
+        width: Theme.touch ? 22px : 18px;
+        height: self.width;
+        x: Theme.touch ? 14px : 10px;
         y: (parent.height - self.height) / 2;
         tint: Theme.text-2;
     }
     Text {
-        x: 38px;
-        width: parent.width - 46px;
+        x: Theme.touch ? 52px : 38px;
+        width: parent.width - self.x - 8px;
         text: root.text;
-        font-size: 14px;
+        font-size: Theme.touch ? 16px : 14px;
         color: Theme.text;
         vertical-alignment: center;
         overflow: elide;
@@ -79,18 +80,26 @@ component MenuItem inherits Rectangle {
     }
 }
 
-/// "Add to playlist": every playlist, plus a new one.
+/// "Add to playlist": every playlist, plus a new one. A popup next to the button that opened it, or
+/// (narrow windows) a sheet up from the bottom edge, `bottom` being the room the system keeps free there.
 component PlaylistMenu inherits Rectangle {
-    property <length> menu-h: min(330px, 54px + 36px * App.playlists.length);
+    in property <length> bottom: 0px;
+    private property <length> item-h: Theme.touch ? 52px : 36px;
+    private property <length> menu-h: Theme.compact
+        ? min(root.height * 0.7, 18px + root.item-h * (App.playlists.length + 1) + root.bottom)
+        : min(330px, 18px + root.item-h * (App.playlists.length + 1));
+    background: Theme.compact ? #00000070 : transparent;
     TouchArea {
         clicked => { App.menu-open = false; }
     }
     Rectangle {
-        width: 250px;
+        width: Theme.compact ? root.width : 250px;
         height: root.menu-h;
-        x: max(8px, min(App.menu-x + 32px - self.width, root.width - self.width - 8px));
-        y: App.menu-y + self.height > root.height - 8px ? max(8px, App.menu-y - self.height - 36px) : App.menu-y;
+        x: Theme.compact ? 0px : max(8px, min(App.menu-x + 32px - self.width, root.width - self.width - 8px));
+        y: Theme.compact ? root.height - self.height : (App.menu-y + self.height > root.height - 8px ? max(8px, App.menu-y - self.height - 36px) : App.menu-y);
         border-radius: 12px * Theme.rounding;
+        border-bottom-left-radius: Theme.compact ? 0px : 12px * Theme.rounding;
+        border-bottom-right-radius: Theme.compact ? 0px : 12px * Theme.rounding;
         background: Theme.overlay;
         border-width: Theme.border-w;
         border-color: Theme.line;
@@ -108,16 +117,16 @@ component PlaylistMenu inherits Rectangle {
         }
         if App.playlists.length > 0: Rectangle {
             x: 10px;
-            y: 44px;
+            y: 8px + root.item-h;
             width: parent.width - 20px;
             height: 1px;
             background: Theme.line;
         }
         ListView {
             x: 4px;
-            y: 49px;
+            y: 13px + root.item-h;
             width: parent.width - 8px;
-            height: parent.height - 53px;
+            height: parent.height - self.y - 5px - root.bottom;
             for name[i] in App.playlists: MenuItem {
                 text: name;
                 d: Icons.playlist;
@@ -134,10 +143,11 @@ component Dialog inherits Rectangle {
         clicked => { App.dialog = 0; }
     }
     Rectangle {
-        width: 400px;
+        width: min(400px, parent.width - 32px);
         height: layout.preferred-height;
         x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2 - 30px;
+        // Narrow windows put it near the top, out of the way of the on-screen keyboard.
+        y: Theme.compact ? 88px : (parent.height - self.height) / 2 - 30px;
         border-radius: 16px * Theme.rounding;
         background: Theme.overlay;
         border-width: Theme.border-w;
@@ -403,7 +413,7 @@ component NowPlaying inherits Rectangle {
         y: 22px;
         width: 220px;
         items: ["Lyrics", "Up Next"];
-        current: App.np-tab;
+        current: max(0, App.np-tab);
         selected(i) => { App.np-tab = i; }
     }
     LyricsView {
@@ -411,7 +421,8 @@ component NowPlaying inherits Rectangle {
         y: 70px;
         width: root.width * 0.44;
         height: root.height - 86px;
-        visible: App.np-tab == 0;
+        // (A narrow window's -1, the player itself, has no counterpart here: it shows the lyrics.)
+        visible: App.np-tab != 1;
     }
     ListView {
         x: root.width * 0.5;
@@ -435,12 +446,24 @@ export component MainWindow inherits Window {
     icon: @image-url("../assets/icon/wisp-128.png");
     preferred-width: 1180px;
     preferred-height: 760px;
-    min-width: 840px;
-    min-height: 560px;
+    min-width: 360px;
+    min-height: 480px;
     background: Theme.bg;
     default-font-family: Theme.font;
     default-font-weight: Theme.weight;
     forward-focus: keys;
+
+    // Below this width the window shows the narrow layout: tabs along the bottom, a mini player, one
+    // pane at a time (see compact.slint). Phones held upright, and thin windows on computers.
+    private property <bool> narrow: self.width < 840px;
+    init => { Theme.compact = self.narrow; }
+    changed narrow => { Theme.compact = self.narrow; }
+
+    // What sits under the browsing area: the player bar, or (narrow) the mini player and the tabs.
+    // The system keeps `safe-area-insets` free of content: the status bar, the notch, the gesture bar.
+    private property <length> nav-h: 56px + self.safe-area-insets.bottom;
+    private property <length> mini-h: App.has-track ? 64px : 0px;
+    private property <length> dock-h: Theme.compact ? self.nav-h + self.mini-h : 88px;
 
     public function focus-search() {
         sidebar.focus-search();
@@ -448,7 +471,7 @@ export component MainWindow inherits Window {
 
     // A modal's text box takes the keyboard focus with it when it closes; without this the player
     // shortcuts (space, arrows, M) would stay dead until the next click.
-    private property <bool> modal-open: App.ed-open || App.dialog != 0 || App.menu-open;
+    private property <bool> modal-open: App.ed-open || App.dialog != 0 || App.menu-open || App.sheet-row >= 0;
     changed modal-open => {
         if (!self.modal-open) {
             keys.focus();
@@ -459,6 +482,14 @@ export component MainWindow inherits Window {
         width: parent.width;
         height: parent.height;
         key-pressed(e) => {
+            if (e.text == Key.Back) {
+                // Android's back button: step out of whatever is open; at the first screen move the
+                // app out of sight (ending it would end the music).
+                if (!App.back()) {
+                    App.leave();
+                }
+                return accept;
+            }
             if (App.ed-open) {
                 // The editor is modal: only Escape reaches past it, no player shortcuts.
                 if (e.text == Key.Escape) {
@@ -480,6 +511,8 @@ export component MainWindow inherits Window {
                     App.dialog = 0;
                 } else if (App.menu-open) {
                     App.menu-open = false;
+                } else if (App.sheet-row >= 0) {
+                    App.sheet-row = -1;
                 } else if (App.np-open) {
                     App.np-open = false;
                 } else if (App.search-text != "") {
@@ -542,22 +575,24 @@ export component MainWindow inherits Window {
 
         // Browsing UI.
         browse := Rectangle {
-            x: 0px;
-            y: 0px;
-            width: parent.width;
-            height: parent.height - 88px;
+            x: Theme.compact ? root.safe-area-insets.left : 0px;
+            y: Theme.compact ? root.safe-area-insets.top : 0px;
+            width: parent.width - self.x - (Theme.compact ? root.safe-area-insets.right : 0px);
+            height: parent.height - self.y - root.dock-h;
             opacity: App.np-open ? 0 : 1;
             visible: self.opacity > 0.005;
             animate opacity { duration: 240ms; easing: ease-out; }
 
+            // (Kept, with no width, on narrow windows: Ctrl+F still has a search box to find.)
             sidebar := Sidebar {
                 x: 0px;
-                width: 232px;
+                width: Theme.compact ? 0px : 232px;
                 height: parent.height;
+                visible: !Theme.compact;
             }
             Rectangle {
-                x: 232px;
-                width: parent.width - 232px;
+                x: sidebar.width;
+                width: parent.width - self.x;
                 height: parent.height;
                 clip: true;
                 if App.page == 0: SongsPage { }
@@ -568,11 +603,12 @@ export component MainWindow inherits Window {
                 if App.page == 5: AlbumDetailPage { }
                 if App.page == 6: PlaylistPage { }
                 if App.page == 7: UnidentifiedPage { }
+                if App.page == 8: PlaylistsPage { }
             }
         }
 
         // Full-screen now playing.
-        NowPlaying {
+        if !Theme.compact: NowPlaying {
             x: 0px;
             y: 0px;
             width: parent.width;
@@ -581,15 +617,43 @@ export component MainWindow inherits Window {
             visible: self.opacity > 0.005;
             animate opacity { duration: 280ms; easing: ease-out; }
         }
+        if Theme.compact: PlayerScreen {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: parent.height;
+            top: root.safe-area-insets.top;
+            bottom: root.safe-area-insets.bottom;
+            opacity: App.np-open ? 1 : 0;
+            visible: self.opacity > 0.005;
+            animate opacity { duration: 280ms; easing: ease-out; }
+        }
 
-        PlayerBar {
+        if !Theme.compact: PlayerBar {
             y: parent.height - self.height;
             width: parent.width;
         }
+        if Theme.compact: MiniPlayer {
+            y: parent.height - root.dock-h;
+            width: parent.width;
+            visible: App.has-track && !App.np-open;
+        }
+        if Theme.compact: TabBar {
+            y: parent.height - root.nav-h;
+            width: parent.width;
+            inset: root.safe-area-insets.bottom;
+            visible: !App.np-open;
+        }
 
+        if App.sheet-row >= 0: SongSheet {
+            width: parent.width;
+            height: parent.height;
+            bottom: root.safe-area-insets.bottom;
+        }
         if App.menu-open: PlaylistMenu {
             width: parent.width;
             height: parent.height;
+            bottom: root.safe-area-insets.bottom;
         }
         if App.dialog != 0: Dialog {
             width: parent.width;
@@ -598,6 +662,9 @@ export component MainWindow inherits Window {
         if App.ed-open: TagEditor {
             width: parent.width;
             height: parent.height;
+            inset-top: root.safe-area-insets.top;
+            inset-bottom: root.safe-area-insets.bottom;
+            keyboard: root.virtual-keyboard-size.height;
         }
 
         // Transient message (errors, "added to queue").
@@ -605,7 +672,7 @@ export component MainWindow inherits Window {
             width: toast-text.preferred-width + 36px;
             height: 38px;
             x: (parent.width - self.width) / 2;
-            y: parent.height - 88px - 52px;
+            y: parent.height - (Theme.compact && App.np-open ? root.safe-area-insets.bottom + 176px : root.dock-h) - 52px;
             border-radius: 19px * Theme.rounding;
             background: Theme.overlay;
             border-width: Theme.border-w;

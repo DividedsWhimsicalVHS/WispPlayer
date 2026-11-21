@@ -1,0 +1,588 @@
+// What narrow windows (`Theme.compact`: a phone held upright, a thin window) use in place of the
+// sidebar and the transport bar: tabs along the bottom, a mini player above them, a full-screen
+// player, and a sheet with a song's actions.
+
+import { Theme, Icons } from "theme.slint";
+import { Icon, IconButton, PillButton, Slider, Cover, Segmented, ListView, Soft, Bevel, Gloss } from "widgets.slint";
+import { QueueItem } from "rows.slint";
+import { LyricsView } from "lyrics.slint";
+import { App } from "state.slint";
+
+/// The song that plays, with play/pause and next, over a thin progress line. Tapping it opens the player.
+export component MiniPlayer inherits Rectangle {
+    height: 64px;
+    background: Theme.bar;
+
+    Rectangle {
+        y: 0px;
+        height: 1px;
+        background: Theme.line;
+    }
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width * clamp(App.progress, 0, 1);
+        height: 2px;
+        background: Theme.accent;
+    }
+    Rectangle {
+        x: 0px;
+        width: parent.width - 108px;
+        Cover {
+            x: 12px;
+            y: (parent.height - self.height) / 2;
+            width: 44px;
+            height: 44px;
+            art: App.art;
+            has-art: App.has-art;
+            seed: App.has-track ? App.now-track : -1;
+            radius: 8px * Theme.rounding;
+        }
+        VerticalLayout {
+            x: 68px;
+            width: parent.width - 68px - 4px;
+            height: parent.height;
+            alignment: center;
+            spacing: 1px;
+            Text {
+                text: App.title;
+                font-size: 15px;
+                font-weight: 600;
+                color: Theme.text;
+                overflow: elide;
+            }
+            Text {
+                text: App.artist;
+                font-size: 13px;
+                color: Theme.text-2;
+                overflow: elide;
+            }
+        }
+        TouchArea {
+            accessible-role: button;
+            accessible-label: "Open now playing";
+            // Opens the player screen on the player itself (not on the lyrics or the queue).
+            accessible-action-default => {
+                App.np-tab = -1;
+                App.np-open = true;
+            }
+            clicked => {
+                App.np-tab = -1;
+                App.np-open = true;
+            }
+        }
+    }
+    Rectangle {
+        x: parent.width - 100px;
+        y: (parent.height - self.height) / 2;
+        width: 44px;
+        height: 44px;
+        border-radius: 22px * Theme.circle;
+        background: pp.pressed ? Theme.accent.darker(0.15) : Theme.accent;
+        Gloss {
+            width: parent.width - 6px;
+            height: parent.height * 0.48;
+            x: 3px;
+            y: 2px;
+            radius: 22px * Theme.circle;
+        }
+        Icon {
+            d: App.playing ? Icons.pause : Icons.play;
+            width: 26px;
+            height: 26px;
+            x: (parent.width - self.width) / 2 + (App.playing ? 0px : 1px);
+            y: (parent.height - self.height) / 2;
+            tint: Theme.on-accent;
+        }
+        pp := TouchArea {
+            accessible-role: button;
+            accessible-label: App.playing ? "Pause" : "Play";
+            accessible-action-default => { App.toggle-play(); }
+            clicked => { App.toggle-play(); }
+        }
+    }
+    IconButton {
+        x: parent.width - 8px - self.width;
+        y: (parent.height - self.height) / 2;
+        d: Icons.next;
+        label: "Next";
+        glyph: 26px;
+        clicked => { App.next(); }
+    }
+}
+
+component TabButton inherits Rectangle {
+    in property <string> label;
+    in property <string> d;
+    in property <bool> active;
+    callback clicked();
+
+    // The highlighted pill behind the icon.
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 6px;
+        width: 56px;
+        height: 30px;
+        border-radius: 15px * Theme.rounding;
+        background: root.active ? Theme.accent.with-alpha(0.2) : ta.pressed ? Theme.press : transparent;
+        animate background { duration: 120ms; }
+        Icon {
+            d: root.d;
+            width: 22px;
+            height: 22px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            tint: root.active ? Theme.accent : Theme.text-2;
+        }
+    }
+    Text {
+        x: 0px;
+        y: 38px;
+        width: parent.width;
+        text: root.label;
+        font-size: 11px;
+        font-weight: root.active ? 700 : 500;
+        color: root.active ? Theme.text : Theme.text-2;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+    ta := TouchArea {
+        accessible-role: tab;
+        accessible-label: root.label;
+        accessible-checkable: true;
+        accessible-checked: root.active;
+        accessible-action-default => { root.clicked(); }
+        clicked => { root.clicked(); }
+    }
+}
+
+/// The places to go, along the bottom. `inset` is the room the system keeps free there (gesture bar).
+export component TabBar inherits Rectangle {
+    in property <length> inset: 0px;
+    height: 56px + root.inset;
+    background: Theme.bar;
+
+    Rectangle {
+        y: 0px;
+        height: 1px;
+        background: Theme.line;
+    }
+    HorizontalLayout {
+        y: 0px;
+        height: 56px;
+        TabButton {
+            label: "Songs";
+            d: Icons.songs;
+            active: App.page == 0;
+            clicked => { App.show-page(0); }
+        }
+        TabButton {
+            label: "Albums";
+            d: Icons.album;
+            active: App.page == 1 || App.page == 5;
+            clicked => { App.show-page(1); }
+        }
+        TabButton {
+            label: "Artists";
+            d: Icons.person;
+            active: App.page == 2;
+            clicked => { App.show-page(2); }
+        }
+        TabButton {
+            label: "Playlists";
+            d: Icons.playlist;
+            active: App.page == 6 || App.page == 8;
+            clicked => { App.show-page(8); }
+        }
+        TabButton {
+            label: "Settings";
+            d: Icons.settings;
+            active: App.page == 4 || App.page == 7;
+            clicked => { App.show-page(4); }
+        }
+    }
+}
+
+/// The full-screen player: the cover and titles, the lyrics, or the queue (chosen along the top),
+/// with the seek bar and the buttons always at the bottom. `top` and `bottom` are the system's insets.
+export component PlayerScreen inherits Rectangle {
+    in property <length> top: 0px;
+    in property <length> bottom: 0px;
+    private property <length> controls-h: 168px;
+    private property <length> content-y: root.top + 68px;
+    private property <length> content-h: root.height - root.bottom - root.controls-h - root.content-y;
+    /// The cover leaves room for the three lines of titles under it.
+    private property <length> cs: max(140px, min(root.width - 64px, root.content-h - 116px));
+    private property <length> block-y: root.content-y + max(0px, (root.content-h - root.cs - 100px) / 2);
+
+    IconButton {
+        x: 8px;
+        y: root.top + 10px;
+        d: Icons.chevron-down;
+        label: "Close now playing";
+        size: 48px;
+        glyph: 28px;
+        clicked => { App.np-open = false; }
+    }
+    Segmented {
+        x: 64px;
+        y: root.top + 14px;
+        width: parent.width - 64px - 16px;
+        items: ["Player", "Lyrics", "Up next"];
+        current: App.np-tab + 1;
+        selected(i) => { App.np-tab = i - 1; }
+    }
+
+    // -- the player itself
+    if App.np-tab < 0: Cover {
+        x: (parent.width - self.width) / 2;
+        y: root.block-y;
+        width: root.cs;
+        height: root.cs;
+        art: App.art;
+        has-art: App.has-art;
+        seed: App.now-track;
+        radius: 18px * Theme.rounding;
+        shadow: true;
+    }
+    if App.np-tab < 0: VerticalLayout {
+        x: 24px;
+        y: root.block-y + root.cs + 22px;
+        width: parent.width - 48px;
+        height: 90px;
+        alignment: start;
+        spacing: 3px;
+        Text {
+            text: App.title;
+            font-family: Theme.title-font;
+            font-size: 24px;
+            font-weight: 700;
+            color: Theme.text;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: App.artist;
+            font-size: 17px;
+            font-weight: 600;
+            color: Theme.accent-text;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: App.album;
+            font-size: 14px;
+            color: Theme.text-2;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    // -- the lyrics
+    if App.np-tab == 0: LyricsView {
+        x: 16px;
+        y: root.content-y;
+        width: parent.width - 32px;
+        height: root.content-h;
+    }
+
+    // -- the queue
+    if App.np-tab == 1: Rectangle {
+        x: 0px;
+        y: root.content-y;
+        width: parent.width;
+        height: root.content-h;
+        HorizontalLayout {
+            x: 12px;
+            y: 0px;
+            width: parent.width - 24px;
+            height: 48px;
+            spacing: 8px;
+            alignment: end;
+            PillButton {
+                text: "Save as playlist";
+                d: Icons.playlist-add;
+                primary: false;
+                clicked => { App.open-dialog(4); }
+            }
+            PillButton {
+                text: "Clear";
+                d: Icons.trash;
+                primary: false;
+                clicked => { App.queue-clear(); }
+            }
+        }
+        ListView {
+            y: 52px;
+            height: parent.height - 52px;
+            for q[i] in App.upnext: QueueItem {
+                entry: q;
+                current: q.uid == App.now-uid;
+                playing: App.playing;
+                // `upnext` starts at the playing track; queue actions address the full queue.
+                play => { App.queue-play(App.upnext-offset + i); }
+                remove => { App.queue-remove(App.upnext-offset + i); }
+            }
+        }
+    }
+
+    // -- the controls
+    controls := Rectangle {
+        y: parent.height - root.bottom - root.controls-h;
+        height: root.controls-h;
+        if App.np-tab >= 0: Text {
+            x: 24px;
+            y: 2px;
+            width: parent.width - 48px;
+            height: 24px;
+            text: App.title + " · " + App.artist;
+            font-size: 14px;
+            font-weight: 600;
+            color: Theme.text-2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            x: 16px;
+            y: 30px;
+            width: parent.width - 32px;
+            height: 32px;
+            spacing: 8px;
+            Text {
+                width: 40px;
+                text: App.pos-text;
+                font-size: 12px;
+                color: Theme.text-2;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+            Slider {
+                value: App.progress;
+                enabled: App.has-track;
+                label: "Seek";
+                committed(v) => { App.seek(v); }
+            }
+            Text {
+                width: 40px;
+                text: App.dur-text;
+                font-size: 12px;
+                color: Theme.text-2;
+                vertical-alignment: center;
+            }
+        }
+        HorizontalLayout {
+            x: 0px;
+            y: 74px;
+            width: parent.width;
+            height: 80px;
+            alignment: center;
+            spacing: 10px;
+            IconButton {
+                d: Icons.shuffle;
+                label: "Shuffle";
+                size: 48px;
+                active: App.shuffle;
+                tint: Theme.text-2;
+                y: (parent.height - self.height) / 2;
+                clicked => { App.toggle-shuffle(); }
+            }
+            IconButton {
+                d: Icons.prev;
+                label: "Previous";
+                size: 56px;
+                glyph: 32px;
+                enabled: App.has-track;
+                y: (parent.height - self.height) / 2;
+                clicked => { App.prev(); }
+            }
+            Rectangle {
+                width: 72px;
+                height: 72px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 36px * Theme.circle;
+                background: big-pp.pressed ? Theme.accent.darker(0.15) : Theme.accent;
+                opacity: App.has-track ? 1 : 0.5;
+                drop-shadow-blur: 18px * Theme.glow;
+                drop-shadow-color: Theme.accent.with-alpha(0.7 * Theme.glow);
+                Gloss {
+                    width: parent.width - 8px;
+                    height: parent.height * 0.48;
+                    x: 4px;
+                    y: 3px;
+                    radius: 36px * Theme.circle;
+                }
+                Icon {
+                    d: App.playing ? Icons.pause : Icons.play;
+                    width: 38px;
+                    height: 38px;
+                    x: (parent.width - self.width) / 2 + (App.playing ? 0px : 2px);
+                    y: (parent.height - self.height) / 2;
+                    tint: Theme.on-accent;
+                }
+                big-pp := TouchArea {
+                    accessible-role: button;
+                    accessible-label: App.playing ? "Pause" : "Play";
+                    accessible-action-default => { App.toggle-play(); }
+                    clicked => { App.toggle-play(); }
+                }
+            }
+            IconButton {
+                d: Icons.next;
+                label: "Next";
+                size: 56px;
+                glyph: 32px;
+                enabled: App.has-track;
+                y: (parent.height - self.height) / 2;
+                clicked => { App.next(); }
+            }
+            IconButton {
+                d: App.repeat == 2 ? Icons.repeat-one : Icons.repeat;
+                label: "Repeat";
+                size: 48px;
+                active: App.repeat > 0;
+                tint: Theme.text-2;
+                y: (parent.height - self.height) / 2;
+                clicked => { App.cycle-repeat(); }
+            }
+        }
+    }
+}
+
+component SheetItem inherits Rectangle {
+    in property <string> text;
+    in property <string> d;
+    callback clicked();
+    height: 52px;
+    background: ta.pressed ? Theme.press : transparent;
+    animate background { duration: 100ms; }
+    Icon {
+        d: root.d;
+        width: 22px;
+        height: 22px;
+        x: 22px;
+        y: (parent.height - self.height) / 2;
+        tint: Theme.text-2;
+    }
+    Text {
+        x: 64px;
+        y: 0px;
+        width: parent.width - 64px - 16px;
+        height: parent.height;
+        text: root.text;
+        font-size: 16px;
+        color: Theme.text;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    ta := TouchArea {
+        accessible-role: button;
+        accessible-label: root.text;
+        accessible-action-default => { root.clicked(); }
+        clicked => { root.clicked(); }
+    }
+}
+
+/// What a song's "more" button offers: play it next, queue it, put it in a playlist, take it out of
+/// the playlist it is in. Slides up over the page; a tap outside closes it.
+export component SongSheet inherits Rectangle {
+    in property <length> bottom: 0px;
+    private property <bool> known: App.sheet-row >= 0 && App.sheet-row < App.tracks.length;
+    background: #00000070;
+
+    TouchArea {
+        clicked => { App.sheet-row = -1; }
+    }
+    panel := Rectangle {
+        width: parent.width;
+        height: 72px + (App.sheet-removable ? 4 : 3) * 52px + 8px + root.bottom;
+        y: parent.height - self.height;
+        background: Theme.overlay;
+        border-top-left-radius: 20px * Theme.rounding;
+        border-top-right-radius: 20px * Theme.rounding;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: Theme.shadow;
+        TouchArea { }
+
+        // the song
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            height: 72px;
+            // grab handle
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: 8px;
+                width: 36px;
+                height: 4px;
+                border-radius: 2px;
+                background: Theme.line;
+            }
+            VerticalLayout {
+                x: 22px;
+                y: 18px;
+                width: parent.width - 44px;
+                height: 50px;
+                alignment: center;
+                spacing: 2px;
+                Text {
+                    text: root.known ? App.tracks[App.sheet-row].title : "";
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.known ? App.tracks[App.sheet-row].artist : "";
+                    font-size: 13px;
+                    color: Theme.text-2;
+                    overflow: elide;
+                }
+            }
+        }
+        Rectangle {
+            x: 16px;
+            y: 71px;
+            width: parent.width - 32px;
+            height: 1px;
+            background: Theme.line;
+        }
+        VerticalLayout {
+            x: 0px;
+            y: 72px;
+            width: parent.width;
+            SheetItem {
+                text: "Play next";
+                d: Icons.play-next;
+                clicked => {
+                    App.play-next-row(App.sheet-row);
+                    App.sheet-row = -1;
+                }
+            }
+            SheetItem {
+                text: "Add to queue";
+                d: Icons.add;
+                clicked => {
+                    App.enqueue-row(App.sheet-row);
+                    App.sheet-row = -1;
+                }
+            }
+            SheetItem {
+                text: "Add to playlist…";
+                d: Icons.playlist-add;
+                clicked => {
+                    App.playlist-menu(App.sheet-row, 0px, 0px);
+                    App.sheet-row = -1;
+                }
+            }
+            if App.sheet-removable: SheetItem {
+                text: "Remove from this playlist";
+                d: Icons.close;
+                clicked => {
+                    App.playlist-remove-row(App.sheet-row);
+                    App.sheet-row = -1;
+                }
+            }
+        }
+    }
+}

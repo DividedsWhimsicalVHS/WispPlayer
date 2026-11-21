@@ -29,10 +29,11 @@ pub fn run() -> Result<(), String> {
     app::run()
 }
 
-/// `wisp --screenshot out.png [--scene songs|albums|artists|queue|settings|detail|unidentified|editor|np|np-queue|empty|toast]
-/// [--theme wisp-dark|catppuccin-mocha|...] [--light] [--size 1180x760]` renders the UI headlessly
-/// with demo data (`--light` is short for `--theme wisp-light`). `None` when the arguments don't ask
-/// for a screenshot.
+/// `wisp --screenshot out.png [--scene songs|albums|artists|queue|settings|detail|unidentified|editor|np|np-queue|empty|toast
+/// |playlists|playlist|sheet|sheet-playlist|menu|dialog|np-lyrics|editor-fields] [--theme wisp-dark|catppuccin-mocha|...]
+/// [--light] [--size 1180x760] [--phone]` renders the UI headlessly with demo data (`--light` is short for
+/// `--theme wisp-light`; `--phone` is a touch screen of 390x844 unless `--size` says otherwise). `None`
+/// when the arguments don't ask for a screenshot.
 #[cfg(feature = "screenshot")]
 pub fn screenshot_cli() -> Option<i32> {
     let args: Vec<String> = std::env::args().collect();
@@ -40,11 +41,12 @@ pub fn screenshot_cli() -> Option<i32> {
     let value = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).cloned();
     let out = args.get(i + 1).cloned().unwrap_or_else(|| "shot.png".into());
     let scene = value("--scene").unwrap_or_else(|| "songs".into());
+    let phone = args.iter().any(|a| a == "--phone");
     let size = value("--size")
         .and_then(|s| s.split_once('x').and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))))
-        .unwrap_or((1180u32, 760u32));
+        .unwrap_or(if phone { (390u32, 844u32) } else { (1180u32, 760u32) });
     let theme = value("--theme").unwrap_or_else(|| if args.iter().any(|a| a == "--light") { "wisp-light" } else { themes::DEFAULT }.into());
-    Some(match shot::run(std::path::Path::new(&out), &scene, &theme, size.0, size.1) {
+    Some(match shot::run(std::path::Path::new(&out), &scene, &theme, size.0, size.1, phone) {
         Ok(()) => {
             println!("wrote {out}");
             0

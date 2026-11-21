@@ -221,7 +221,7 @@ pub fn run() -> Result<(), String> {
     }
 
     let ui = MainWindow::new().map_err(|e| e.to_string())?;
-    ui.global::<Theme>().set_touch(cfg!(mobile));
+    ui.global::<Theme>().set_touch_screen(cfg!(mobile));
     let loader = Loader::spawn(|done| on_ui_thread(move |ctl| handle_done(ctl, done)));
     let playlists = Playlists::new(dir.join("Playlists"));
     let songs = TrackList::new(lib.clone());
@@ -300,7 +300,7 @@ pub fn run() -> Result<(), String> {
         // Logical size at the monitor's native scale; the window is fitted to the screen once it exists.
         let c = ctl.borrow();
         let (w, h) = (c.settings.f32("window_w", 1180.0), c.settings.f32("window_h", 760.0));
-        ui.window().set_size(slint::LogicalSize::new(w.clamp(840.0, 6000.0), h.clamp(560.0, 4000.0)));
+        ui.window().set_size(slint::LogicalSize::new(w.clamp(360.0, 6000.0), h.clamp(480.0, 4000.0)));
     }
     let close_ctl = ctl.clone();
     let close_ui = ui.as_weak();

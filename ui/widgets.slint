@@ -94,7 +94,7 @@ export component Gloss inherits Rectangle {
 export component IconButton inherits Rectangle {
     in property <string> d;
     in property <string> label;
-    in property <length> size: 36px * Theme.hit;
+    in property <length> size: (Theme.touch ? 44px : 36px) * Theme.hit;
     in property <length> glyph: 22px;
     in property <color> tint: Theme.text;
     in property <bool> active: false;
@@ -135,8 +135,8 @@ export component PillButton inherits Rectangle {
     in property <bool> compact: false;
     callback clicked();
 
-    height: 36px;
-    border-radius: 18px * Theme.rounding;
+    height: Theme.touch ? 44px : 36px;
+    border-radius: root.height / 2 * Theme.rounding;
     background: root.primary
         ? (ta.pressed ? Theme.accent.darker(0.15) : ta.has-hover ? Theme.accent.brighter(0.1) : Theme.accent)
         : Theme.neu > 0 ? transparent
@@ -150,7 +150,7 @@ export component PillButton inherits Rectangle {
     if !root.primary: Soft {
         width: parent.width;
         height: parent.height;
-        radius: 18px * Theme.rounding;
+        radius: root.height / 2 * Theme.rounding;
         pressed: ta.pressed;
         fill: ta.pressed ? Theme.surface-hi : Theme.surface;
     }
@@ -179,7 +179,7 @@ export component PillButton inherits Rectangle {
         y: 0px;
         width: parent.width;
         height: parent.height * 0.5;
-        radius: 18px * Theme.rounding;
+        radius: root.height / 2 * Theme.rounding;
     }
     Bevel {
         width: parent.width;
@@ -209,7 +209,7 @@ export component Slider inherits Rectangle {
     private property <float> drag-v: 0;
     private property <float> shown: clamp(ta.pressed ? root.drag-v : root.value, 0, 1);
 
-    height: 20px;
+    height: Theme.touch ? 32px : 20px;
     opacity: root.enabled ? 1 : 0.4;
 
     Rectangle {
@@ -234,15 +234,16 @@ export component Slider inherits Rectangle {
         }
     }
     Rectangle {
-        width: 12px;
-        height: 12px;
-        border-radius: 6px * Theme.circle;
+        width: Theme.touch ? 16px : 12px;
+        height: self.width;
+        border-radius: self.width / 2 * Theme.circle;
         x: parent.width * root.shown - self.width / 2;
         y: (parent.height - self.height) / 2;
         background: #ffffff;
         drop-shadow-blur: 4px;
         drop-shadow-color: Theme.shadow;
-        opacity: root.enabled && (ta.has-hover || ta.pressed) ? 1 : 0;
+        // Nothing to hover with on a touch screen, so the handle is always there.
+        opacity: root.enabled && (Theme.touch || ta.has-hover || ta.pressed) ? 1 : 0;
         animate opacity { duration: 100ms; }
     }
     ta := TouchArea {
@@ -307,7 +308,7 @@ export component Segmented inherits Rectangle {
     in property <int> current;
     callback selected(int);
 
-    height: 32px;
+    height: Theme.touch ? 40px : 32px;
     border-radius: 10px * Theme.rounding;
     background: Theme.surface;
     border-width: Theme.border-w;
@@ -326,7 +327,7 @@ export component Segmented inherits Rectangle {
             animate background { duration: 120ms; }
             Text {
                 text: item;
-                font-size: 13px;
+                font-size: Theme.touch ? 14px : 13px;
                 font-weight: i == root.current ? 600 : 500;
                 color: i == root.current ? Theme.text : Theme.text-2;
                 horizontal-alignment: center;
@@ -353,7 +354,7 @@ export component SearchField inherits Rectangle {
     callback accepted(string);
     public function focus-field() { input.focus(); }
 
-    height: 34px;
+    height: Theme.touch ? 42px : 34px;
     border-radius: 10px * Theme.rounding;
     background: input.has-focus ? Theme.surface-hi : Theme.surface;
     border-width: Theme.border-w;
@@ -492,6 +493,8 @@ export component ListView inherits Rectangle {
             animate width, opacity { duration: 120ms; }
         }
         bar-ta := TouchArea {
+            // A finger scrolls the list itself; the strip must not take taps from the rows' buttons.
+            enabled: !Theme.touch;
             pointer-event(e) => {
                 if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
                     if (self.mouse-y >= thumb.y && self.mouse-y <= thumb.y + thumb.height) {
