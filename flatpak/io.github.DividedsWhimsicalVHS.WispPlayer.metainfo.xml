@@ -29,6 +29,16 @@
     <binary>wisp</binary>
   </provides>
 
+  <!-- The window adapts down to a phone's width: tabs, a mini player and a full-screen player. -->
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </recommends>
+
   <url type="homepage">https://github.com/DividedsWhimsicalVHS/WispPlayer</url>
   <url type="bugtracker">https://github.com/DividedsWhimsicalVHS/WispPlayer/issues</url>
   <url type="vcs-browser">https://github.com/DividedsWhimsicalVHS/WispPlayer</url>

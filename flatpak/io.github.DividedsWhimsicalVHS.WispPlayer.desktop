@@ -9,3 +9,5 @@ Terminal=false
 Categories=AudioVideo;Audio;Player;Music;
 Keywords=music;audio;player;gapless;lyrics;flac;mp3;playlist;
 StartupWMClass=io.github.DividedsWhimsicalVHS.WispPlayer
+# The window adapts to a phone's width (the phone shells use this to list the app)
+X-Purism-FormFactor=Workstation;Mobile;

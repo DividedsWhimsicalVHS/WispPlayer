@@ -2,9 +2,9 @@
 
 # Wisp Player
 
-A featherweight, gapless desktop audio player for local files, written in Rust. Free software under the GNU GPL v3, designed and written by Claude (see [Credits](#credits)).
+A featherweight, gapless audio player for local files, written in Rust, for **Windows**, **Linux** (as a Flatpak) and **Android**. Free software under the GNU GPL v3, designed and written by Claude (see [Credits](#credits)).
 
-**[Download the Windows installer](https://github.com/DividedsWhimsicalVHS/WispPlayer/releases/latest)**: it adds a desktop shortcut and a Start Menu entry, and needs no administrator rights.
+**[Download](https://github.com/DividedsWhimsicalVHS/WispPlayer/releases/latest)** the Windows installer (a desktop shortcut and a Start Menu entry, no administrator rights), the Linux Flatpak, or the Android app (an APK). See [Install](#install).
 
 * **Small:** about 10 MB of RAM (private working set) with a few hundred tracks loaded, about 13 MB with ten thousand. No WebView, no GPU context, no scripting runtime.
 * **Glitch-free by construction:** the audio callback never allocates, locks or waits; the UI thread cannot starve it.
@@ -12,8 +12,17 @@ A featherweight, gapless desktop audio player for local files, written in Rust. 
 * **Apple Music–inspired UI:** artwork-tinted ambient backdrop, synced lyrics, rounded translucent surfaces, and **35 themes**, from Catppuccin and Nord to Winamp, Windows 95 and Liquid Glass, plus an Album Chameleon that takes its colours from the cover.
 * **Playlists**, and a **tag editor** for songs that arrive without proper tags: Wisp flags them, you search for each one, pick the right match (album, cover and lyrics included) and only then is anything saved. Nothing is renamed, moved or retagged on its own.
 
-On Windows the whole dependency tree is pure Rust: nothing is compiled from C, and nothing beyond the operating system's own audio, windowing and TLS APIs is needed at run time.
+On Windows the whole dependency tree is pure Rust: nothing is compiled from C, and nothing beyond the operating system's own audio, windowing and TLS APIs is needed at run time. The Android app draws with Skia (Slint's only renderer there) and is larger for it.
 
+<p align="center">
+  <img src="assets/screenshots/songs.png" width="520" alt="The songs page on a computer, with the sidebar, the playlists and the player bar">
+  <img src="assets/screenshots/np.png" width="520" alt="Now playing on a computer, with the lyrics following the song">
+</p>
+<p align="center">
+  <img src="assets/screenshots/phone-songs.png" width="190" alt="The songs page on a phone, with the tabs and the mini player">
+  <img src="assets/screenshots/phone-np.png" width="190" alt="The full-screen player on a phone">
+  <img src="assets/screenshots/phone-np-lyrics.png" width="190" alt="Synced lyrics on a phone">
+</p>
 ## Contents
 
 1. [Features](#features)
@@ -116,6 +125,29 @@ To remove it, use *Settings → Apps → Installed apps* (or the Start Menu entr
 
 The installer is not code-signed (a certificate costs money), so Windows SmartScreen may say "Windows protected your PC" the first time: choose *More info*, then *Run anyway*. Each release lists the installer's SHA-256 checksum, so you can check the download with `Get-FileHash`.
 
+### Linux (Flatpak)
+
+Download `WispPlayer-<version>-x86_64.flatpak` from the [latest release](https://github.com/DividedsWhimsicalVHS/WispPlayer/releases/latest) and install it. The bundle needs the Freedesktop runtime from [Flathub](https://flathub.org/setup), which Flatpak fetches by itself once Flathub is set up:
+
+```sh
+flatpak install --user WispPlayer-<version>-x86_64.flatpak
+flatpak run io.github.DividedsWhimsicalVHS.WispPlayer
+```
+
+The app is sandboxed. It can show a window (Wayland or X11), play sound (PulseAudio or PipeWire), use the network (only for the tag editor's lookups, on request) and read and write your `Music` folder (it writes only the tags the editor saves into MP3 files). Another folder is added in *Settings → Library → Add folder*, which asks the desktop's file chooser; Flatpak then lets the app read that folder. The window is responsive, so it also fits the narrow screen of a Linux phone.
+
+### Android
+
+Download `WispPlayer-<version>-arm64-v8a.apk` from the [latest release](https://github.com/DividedsWhimsicalVHS/WispPlayer/releases/latest) and open it on the phone (Android asks once to let your browser or file manager install apps). It needs Android 8.0 or newer on a 64-bit phone (nearly every phone of the last ten years). The first time it starts it asks for two permissions: to read your music, and (Android 13 and later) to show the notification with the play buttons. Both are optional in the sense that Android lets you say no; without the first there is no music to show.
+
+* It plays the files in the phone's `Music` folder (`/storage/emulated/0/Music`), and rescans them when it starts. Put music elsewhere and it won't be found: there is no folder chooser on a phone yet.
+* **Playback goes on with the screen off or the app out of sight.** A notification (also on the lock screen) shows the song with previous, play/pause and next; headset buttons work, music pauses for a phone call and when the headphones are unplugged.
+* The **Back** key steps out of whatever is open (a sheet, the player, an album) and, on the first screen, sends the app to the background instead of closing it, so the music keeps playing. Swiping the app away from the recent apps closes it and stops the music.
+* The interface follows the phone: bottom tabs (Songs, Albums, Artists, Playlists, Settings), a mini player that opens the full player, a *More* button on every song, and the tag editor in two steps (matches, then fields). On a tablet or in landscape, wide enough windows get the computer layout.
+* The tag editor can look songs up and keep what you pick in Wisp's library, but it cannot rewrite an MP3 in place: Android doesn't let an app change files that other apps made.
+
+The APK is signed with the project's own key (the same for every release, so updates install over the previous version); each release lists its SHA-256 checksum.
+
 ## Build and run
 
 ### Windows
@@ -154,10 +186,46 @@ writes `dist\WispPlayer-Setup-<version>.exe` (about 9 MB). Without `/DExePath` t
 powershell -ExecutionPolicy Bypass -File assets\icon\build-icons.ps1
 ```
 
-### Linux and macOS
+### Linux
 
-The code is written to be portable (cpal, winit and Slint are cross-platform) but only Windows has been built and tested. On Linux you will need the ALSA and OpenSSL development headers (`libasound2-dev`, `libssl-dev`; OpenSSL is what the system TLS means there), and the folder picker (`rfd`) needs a backend feature enabled in `Cargo.toml`.
+```sh
+sudo apt install pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev libfontconfig1-dev
+cargo run --release
+```
 
+(The names are Debian's and Ubuntu's; other distributions have the same development packages under their own names.) TLS is rustls with bundled certificate roots, so no OpenSSL is needed; the folder picker asks the desktop portal. To build the **Flatpak** yourself:
+
+```sh
+flatpak-builder --user --install-deps-from=flathub --force-clean --install build-dir flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
+flatpak run io.github.DividedsWhimsicalVHS.WispPlayer
+```
+
+`flatpak build-bundle` turns the result into a single `.flatpak` file. The manifest downloads the crates while it builds; Flathub itself builds offline, for which the crates would be listed as sources with `flatpak-cargo-generator` (not done: this is not on Flathub).
+
+### macOS
+
+The code has no macOS-specific parts but has not been built there.
+
+### Android
+
+The app is the same player compiled as a native library (the `android` crate, `libwispplayer.so`) inside a small Gradle project that adds the activity, the playback service and the resources. You need:
+
+* a JDK 17, the Android SDK (a platform of API 35 and its build tools) and **NDK r30 or newer**: Slint's prebuilt Skia is built against that NDK's C++ library and crashes at startup with an older one;
+* Rust with the Android targets (`rustup target add aarch64-linux-android`), [`cargo-ndk`](https://github.com/bbqsrc/cargo-ndk), and Gradle 8.9 or newer.
+
+```sh
+export ANDROID_HOME=$HOME/Android/Sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<an r30 version>
+# cargo-ndk sets ANDROID_PLATFORM to the API level it builds for, which hides the SDK platform
+# that Slint's build script needs for its Java helper: name android.jar yourself.
+export ANDROID_JAR=$ANDROID_HOME/platforms/android-35/android.jar
+
+cargo ndk --platform 26 -t arm64-v8a -o android/app/src/main/jniLibs build --release -p wisp-android
+cd android
+gradle assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+```
+
+`-t x86_64` (and `-PwispAbis=x86_64` for Gradle) builds for the emulator on a computer. For a release APK use `gradle assembleRelease` with the signing key named in `WISP_KEYSTORE`, `WISP_KEYSTORE_PASSWORD`, `WISP_KEY_ALIAS` and `WISP_KEY_PASSWORD`; without them it is left unsigned. The continuous-integration workflow (`.github/workflows/ci.yml`) does all of this, and also starts the app in an emulator with a few songs and keeps the screenshots.
 ### Try it without your own music
 
 ```powershell
@@ -170,7 +238,7 @@ writes 400 tiny silent MP3s (tags, embedded and folder covers, `.lrc` and embedd
 
 | What | Where |
 | --- | --- |
-| Settings (plain `key=value` text) and library index | `%LOCALAPPDATA%\Wisp` (Windows), `~/Library/Application Support/Wisp` (macOS), `$XDG_DATA_HOME/Wisp` (Linux) |
+| Settings (plain `key=value` text) and library index | `%LOCALAPPDATA%\Wisp` (Windows), `~/Library/Application Support/Wisp` (macOS), `$XDG_DATA_HOME/Wisp` (Linux; in the Flatpak `~/.var/app/io.github.DividedsWhimsicalVHS.WispPlayer/data/Wisp`), the app's private folder (Android) |
 | Playlists (`.m3u8`) and covers chosen in the tag editor for files that can't hold one | `Playlists` and `Covers` inside that folder |
 | Override the location | set `WISP_DATA_DIR` |
 | Playback diagnostics | set `WISP_DEBUG=1`: prints track, position and underrun count every 2 s while playing, and a line when a library scan ends |
@@ -183,7 +251,7 @@ Settings are written atomically (temp file + rename), so a crash cannot leave a 
 cargo run --features screenshot -- --screenshot out.png --scene np --theme catppuccin-mocha --size 1180x760
 ```
 
-renders the interface with demo data (scenes: `songs`, `albums`, `artists`, `queue`, `settings`, `detail`, `unidentified`, `editor`, `np`, `np-queue`, `empty`, `toast`) using the software renderer, no window required. `--theme` takes any theme id from `src/themes.rs` (`wisp-dark` by default; `--light` is short for `wisp-light`).
+renders the interface with demo data (scenes: `songs`, `albums`, `artists`, `queue`, `settings`, `detail`, `unidentified`, `editor`, `np`, `np-queue`, `empty`, `toast`, and for the phone layout also `playlists`, `playlist`, `sheet`, `sheet-playlist`, `menu`, `dialog`, `np-lyrics`, `editor-fields`) using the software renderer, no window required. `--theme` takes any theme id from `src/themes.rs` (`wisp-dark` by default; `--light` is short for `wisp-light`). `--phone` makes it a touch screen of 390×844 (any width under 840 gets the narrow layout; `--size` sets another size). The pictures in `assets/screenshots` come from this.
 
 ## Keyboard shortcuts
 
@@ -195,23 +263,25 @@ renders the interface with demo data (scenes: `songs`, `albums`, `artists`, `que
 | M | Mute |
 | Ctrl+F | Focus search |
 | Esc | Close the tag editor, or Now Playing, or clear the search |
+| Back (Android) | Step out of the open sheet, editor, player or page; on the first screen, move the app to the background |
 
 ## Crates and why
 
 | Crate | Role | Why this one |
 | --- | --- | --- |
-| `slint` (winit backend, **software renderer**) | UI | Native, declarative, no WebView. The CPU renderer means no GL/D3D/Vulkan context is ever created, which is where much of a typical toolkit's baseline RAM goes. Layout and drawing are retained and incremental: only changed regions are repainted. |
+| `slint` (winit backend, **software renderer**; its Android backend, which draws with Skia, on phones) | UI | Native, declarative, no WebView. On computers the CPU renderer means no GL/D3D/Vulkan context is ever created, which is where much of a typical toolkit's baseline RAM goes. Layout and drawing are retained and incremental: only changed regions are repainted. |
 | `symphonia` | Demux and decode MP3, AAC, ALAC, FLAC, Vorbis, PCM/WAV, AIFF; demux MP4/M4A and Matroska/WebM; read ID3/APE tags | Pure Rust, streaming, allocation-light. |
 | `opus-decoder` | Opus decode | Pure Rust; Symphonia only demuxes Opus. Correct but not optimized yet: see *Measured results*. |
 | `rubato` | Sample-rate conversion | High-quality FFT resampler that can run as one continuous stream across tracks. |
-| `cpal` | Audio output (WASAPI) | The standard cross-platform audio I/O layer. |
+| `cpal` | Audio output (WASAPI on Windows, PulseAudio or PipeWire on Linux, AAudio on Android) | The standard cross-platform audio I/O layer. |
 | `crossbeam-queue` | Lock-free ring buffers | The real-time hand-off between decoder and audio callback. |
 | `redb` | Library index | Embedded, pure-Rust, copy-on-write B-tree with a small, bounded page cache. |
 | `jpeg-decoder`, `png` | Artwork | JPEG is decoded at 1/2, 1/4 or 1/8 scale straight from the DCT coefficients; PNG streams through a row-by-row downscaler. A 4000×4000 cover costs a few hundred KB, transiently. |
-| `rfd` | Folder and cover-image pickers | Native dialog, no UI toolkit pulled in. |
+| `rfd` | Folder and cover-image pickers (Windows, macOS, and the desktop portal on Linux) | Native dialog, no UI toolkit pulled in. |
 | `fastrand` | Shuffle | Tiny. |
-| `ureq` (with `native-tls`) | HTTPS for MusicBrainz, the Cover Art Archive and LRCLIB | Small, blocking (it runs on its own thread anyway). TLS and certificates come from the operating system (SChannel on Windows), so no crypto library is compiled in. |
+| `ureq` (with `native-tls` on Windows, `rustls` elsewhere) | HTTPS for MusicBrainz, the Cover Art Archive and LRCLIB | Small, blocking (it runs on its own thread anyway). On Windows TLS and certificates come from the operating system (SChannel), so no crypto library is compiled in; Linux sandboxes and Android get rustls with bundled roots instead of depending on a system TLS library. |
 | `serde_json` | Reading MusicBrainz and LRCLIB answers | The standard. |
+| `jni` (Android only) | Telling the playback service what plays | The player is native; this carries its state to the Java service that shows the notification. |
 
 ## Project layout
 
@@ -219,13 +289,19 @@ renders the interface with demo data (scenes: `songs`, `albums`, `artists`, `que
 Cargo.toml            dependencies and the release profile (fat LTO, 1 codegen unit, stripped)
 build.rs              compiles the Slint UI; puts the icon and version information into wisp.exe
 LICENSE               GNU General Public License v3
-THIRD-PARTY-LICENSES.md  the crates that go into the Windows build, with their licenses
-assets/icon/          the cassette-player icon: SVG masters, wisp.ico, wisp-128.png and the script that makes them
+THIRD-PARTY-LICENSES.md  the crates that go into the builds, with their licenses
+assets/icon/          the cassette-player icon: SVG masters, wisp.ico, wisp-128.png, the Android layer, and the script that makes them
+assets/screenshots/   headless screenshots (store pictures, from the screenshot tool)
 installer/            Inno Setup script for the Windows installer
+flatpak/              Flatpak manifest, desktop entry and AppStream metadata
+android/              the Android app: the Rust launcher (src/), the activity and playback service (app/), CI scripts
+.github/workflows/    CI: tests on Linux and Windows, the Flatpak, the Android app in an emulator
 examples/
   demo_library.rs     generates a demo music library
 src/
-  main.rs             entry point; headless screenshot CLI (feature "screenshot")
+  main.rs             entry point of the computer version; headless screenshot CLI (feature "screenshot")
+  lib.rs              the program as a library: computers and the Android launcher both call `run`
+  host.rs             what the player asks of a phone (the media notification) and takes back (its buttons)
   app.rs              controller: wires the UI to the player, library and settings
   app/editor.rs       controller of the tag editor
   settings.rs         key=value settings file, data directory
@@ -257,13 +333,14 @@ src/
   demo.rs, shot.rs    headless screenshots (feature "screenshot")
   testdata/           small fixtures for the tests (MP4, WebM and Matroska files with a sine-wave soundtrack)
 ui/
-  app.slint           window, Now Playing overlay, keyboard handling
+  app.slint           window (wide and narrow layouts), Now Playing overlay, keyboard and Back handling
+  compact.slint       what narrow windows use: tabs, mini player, full-screen player, song action sheet
   state.slint         the single global `App` that holds UI state and callbacks
   theme.slint         the Theme global (colour and style tokens that themes.rs fills in), icons
   widgets.slint       buttons, slider, toggle, segmented control, virtualized list
   rows.slint          song, queue, album, artist and unidentified-song rows
-  pages.slint         Songs / Albums / Artists / Queue / album detail / Unidentified tracks / Settings
-  editor.slint        the track lookup & tag editor
+  pages.slint         Songs / Albums / Artists / Queue / Playlists / album detail / Unidentified tracks / Settings
+  editor.slint        the track lookup & tag editor (side by side, or in two steps on a phone)
   bar.slint           player bar
   lyrics.slint        lyrics view with follow-scroll
 ```

@@ -8,7 +8,7 @@
 ; Menu entry, and registers an uninstaller under Settings > Apps.
 
 #define AppName "Wisp Player"
-#define AppVersion "0.1.0"
+#define AppVersion "0.2.0"
 #define AppExe "wisp.exe"
 #define AppUrl "https://github.com/DividedsWhimsicalVHS/WispPlayer"
 ; The built program; override with /DExePath=... when cargo's target directory is elsewhere.

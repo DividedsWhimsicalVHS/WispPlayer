@@ -72,7 +72,13 @@ jobs:
             flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
           flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo repo \
             WispPlayer-x86_64.flatpak io.github.DividedsWhimsicalVHS.WispPlayer
-      - uses: actions/upload-artifact@v4
+      # When the build fails in its AppStream step, say why (flatpak-builder only prints the tags).
+      - name: AppStream report
+        if: failure()
+        run: |
+          sudo apt-get install -y --no-install-recommends appstream-compose || true
+          appstreamcli compose --verbose --print-report --no-partial-urls --origin=flatpak --prefix=/ \
+            --components=io.github.DividedsWhimsicalVHS.WispPlayer --result-root=/tmp/compose build-dir/files || true      - uses: actions/upload-artifact@v4
         with:
           name: flatpak-x86_64
           path: WispPlayer-x86_64.flatpak
