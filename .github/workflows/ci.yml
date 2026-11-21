@@ -44,8 +44,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends appstream desktop-file-utils
-      - name: Validate the AppStream file (screenshots are fetched from main, so not here)
-        run: appstreamcli validate --no-net --pedantic flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.metainfo.xml
+      # Not --pedantic: the app id keeps the capitals of the GitHub account it is named after, which
+      # that mode only suggests lower-casing. Screenshots are fetched from main, so not checked here.
+      - name: Validate the AppStream file
+        run: appstreamcli validate --no-net flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.metainfo.xml
       - name: Validate the desktop entry
         run: desktop-file-validate flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.desktop
 
