@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.DividedsWhimsicalVHS.WispPlayer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+
+  <name>Wisp Player</name>
+  <summary>A featherweight, gapless music player</summary>
+  <developer id="io.github.DividedsWhimsicalVHS">
+    <name>Claude (Anthropic) and the Wisp Player contributors</name>
+  </developer>
+
+  <description>
+    <p>
+      Wisp Player plays the music already on your computer: gapless, with a small memory footprint
+      and no web view or GPU context. It was designed and written by Claude, an AI model made by Anthropic.
+    </p>
+    <ul>
+      <li>Gapless playback of MP3, FLAC, WAV, AAC, Ogg Vorbis, Opus, ALAC and AIFF files, and of the sound of MP4, WebM and MKV videos</li>
+      <li>Synchronized lyrics that follow the song, from .lrc files or the file's own tags</li>
+      <li>Albums, artists and playlists, with search that ignores case and accents</li>
+      <li>35 themes, from Catppuccin and Nord to Winamp and Windows 95, plus one that takes its colors from the album cover</li>
+      <li>A tag editor for songs without proper tags: it flags them, looks each one up on request, and only changes a file when you press Save</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.DividedsWhimsicalVHS.WispPlayer.desktop</launchable>
+  <provides>
+    <binary>wisp</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/DividedsWhimsicalVHS/WispPlayer</url>
+  <url type="bugtracker">https://github.com/DividedsWhimsicalVHS/WispPlayer/issues</url>
+  <url type="vcs-browser">https://github.com/DividedsWhimsicalVHS/WispPlayer</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.2.0" date="2026-11-22">
+      <description>
+        <p>First release for Linux. The same player now also runs on Android phones and tablets.</p>
+      </description>
+    </release>
+  </releases>
+</component>

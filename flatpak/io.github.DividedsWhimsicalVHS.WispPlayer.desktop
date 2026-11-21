@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Wisp Player
+GenericName=Music Player
+Comment=A featherweight, gapless music player
+Exec=wisp
+Icon=io.github.DividedsWhimsicalVHS.WispPlayer
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+Keywords=music;audio;player;gapless;lyrics;flac;mp3;playlist;
+StartupWMClass=io.github.DividedsWhimsicalVHS.WispPlayer

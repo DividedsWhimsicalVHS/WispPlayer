@@ -7,6 +7,7 @@
 #   wisp.ico        (next to this script) every size in one file; build.rs puts it into wisp.exe and
 #                   the installer uses it
 #   wisp-128.png    (next to this script) the window icon (ui/app.slint) and the logo in the README
+#   png\wisp-<size>.png   64, 128, 256 and 512 px for Linux icon themes and Android
 #   ..\..\installer\wizard-*.png   the pictures in the setup wizard (see installer\WispPlayer.iss)
 #
 # The SVGs are rasterized with the headless Microsoft Edge that ships with Windows, so nothing
@@ -66,6 +67,11 @@ foreach ($item in $plan) { $bw.Write($item.Bytes) }
 $bw.Flush()
 [IO.File]::WriteAllBytes((Join-Path $here "wisp.ico"), $ms.ToArray())
 [IO.File]::WriteAllBytes((Join-Path $here "wisp-128.png"), ($plan | Where-Object { $_.Size -eq 128 }).Bytes)
+# The same drawing as PNG files for Linux icon themes (the Flatpak installs these) and Android.
+$pngDir = Join-Path $here "png"
+New-Item -ItemType Directory -Force $pngDir | Out-Null
+foreach ($size in 64, 128, 256) { [IO.File]::WriteAllBytes((Join-Path $pngDir "wisp-$size.png"), ($plan | Where-Object { $_.Size -eq $size }).Bytes) }
+Convert-SvgToPng (Get-Content -Raw -Encoding utf8 (Join-Path $here "wisp.svg")) (Join-Path $pngDir "wisp-512.png") 512 512
 # The pictures of the setup wizard: the icon on the app's dark purple, at 100% and 200% scale.
 $installerDir = Join-Path $here "..\..\installer"
 $full = Get-Content -Raw -Encoding utf8 (Join-Path $here "wisp.svg")

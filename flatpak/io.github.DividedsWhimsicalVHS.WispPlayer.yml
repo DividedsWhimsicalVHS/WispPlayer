@@ -1,0 +1,57 @@
+# Flatpak manifest for Wisp Player. Build and run it with:
+#
+#   flatpak-builder --user --install-deps-from=flathub --force-clean --install build-dir flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
+#   flatpak run io.github.DividedsWhimsicalVHS.WispPlayer
+#
+app-id: io.github.DividedsWhimsicalVHS.WispPlayer
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: wisp
+
+finish-args:
+  # A window, on Wayland or (failing that) X11.
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Sound.
+  - --socket=pulseaudio
+  # The track editor's lookups (MusicBrainz, Cover Art Archive, LRCLIB).
+  - --share=network
+  # The music folder: read for the library, and write for the tags the editor saves into MP3s.
+  # Other folders are added with the file chooser, which goes through the desktop portal.
+  - --filesystem=xdg-music
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/wisp/cargo
+
+modules:
+  - name: wisp
+    buildsystem: simple
+    build-options:
+      # cargo downloads the crates while building. (Flathub builds offline: for it the crates would be
+      # listed as sources, made from Cargo.lock with flatpak-cargo-generator.)
+      build-args:
+        - --share=network
+    build-commands:
+      - cargo build --release --locked
+      - install -Dm755 target/release/wisp /app/bin/wisp
+      - install -Dm644 flatpak/${FLATPAK_ID}.desktop /app/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm644 flatpak/${FLATPAK_ID}.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm644 assets/icon/wisp.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+      - install -Dm644 assets/icon/png/wisp-64.png /app/share/icons/hicolor/64x64/apps/${FLATPAK_ID}.png
+      - install -Dm644 assets/icon/png/wisp-128.png /app/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
+      - install -Dm644 assets/icon/png/wisp-256.png /app/share/icons/hicolor/256x256/apps/${FLATPAK_ID}.png
+      - install -Dm644 assets/icon/png/wisp-512.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png
+      - install -Dm644 LICENSE /app/share/licenses/${FLATPAK_ID}/LICENSE
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - target
+          - dist

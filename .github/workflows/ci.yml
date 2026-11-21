@@ -36,3 +36,31 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Tests
         run: cargo test --locked
+
+  # The store metadata and the desktop entry must be valid before the Flatpak is worth building.
+  flatpak-metadata:
+    name: Flatpak metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends appstream desktop-file-utils
+      - name: Validate the AppStream file (screenshots are fetched from main, so not here)
+        run: appstreamcli validate --no-net --pedantic flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.metainfo.xml
+      - name: Validate the desktop entry
+        run: desktop-file-validate flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.desktop
+
+  flatpak:
+    name: Flatpak (x86_64)
+    needs: flatpak-metadata
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: WispPlayer-x86_64.flatpak
+          manifest-path: flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          arch: x86_64
