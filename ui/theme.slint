@@ -5,6 +5,9 @@
 
 export global Theme {
     // -- settings
+    /// The screen is touched, not pointed at: nothing waits for a hover, targets are bigger, a tap
+    /// is enough where a mouse double-clicks. Set once at startup, by the platform.
+    in-out property <bool> touch: false;
     /// 0 = compact, 1 = comfortable, 2 = spacious
     in-out property <int> density: 1;
     in-out property <bool> backdrop-on: true;

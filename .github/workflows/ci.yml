@@ -66,3 +66,160 @@ jobs:
           manifest-path: flatpak/io.github.DividedsWhimsicalVHS.WispPlayer.yml
           cache-key: flatpak-builder-${{ github.sha }}
           arch: x86_64
+
+  # The Android app: the player as a native library (cargo-ndk) inside a small Gradle project that adds
+  # the activity and the playback service. Needs NDK r30: Slint's prebuilt Skia is built against its C++
+  # library and crashes at startup with an older one.
+  android:
+    name: Android build
+    runs-on: ubuntu-24.04
+    env:
+      # The release key is a repository secret; without it (forks) the release APK stays unsigned.
+      WISP_KEYSTORE_B64: ${{ secrets.WISP_KEYSTORE_B64 }}
+      WISP_KEYSTORE_PASSWORD: ${{ secrets.WISP_KEYSTORE_PASSWORD }}
+      WISP_KEY_ALIAS: ${{ secrets.WISP_KEY_ALIAS }}
+      WISP_KEY_PASSWORD: ${{ secrets.WISP_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+      - name: Android NDK r30
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          ndk=$("$sdkmanager" --list 2>/dev/null | grep -oE 'ndk;30\.[0-9.]+' | sort -uV | tail -1)
+          if [ -z "$ndk" ]; then echo "the SDK manager offers no NDK r30"; "$sdkmanager" --list 2>/dev/null | grep ndk; exit 1; fi
+          yes | "$sdkmanager" "$ndk" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${ndk#ndk;}" >> "$GITHUB_ENV"
+      - run: cargo install cargo-ndk --locked
+      - name: Native library (phones are arm64, the emulator on a computer is x86_64)
+        run: cargo ndk --platform 26 -t arm64-v8a -t x86_64 -o android/app/src/main/jniLibs build --release --locked -p wisp-android
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Signing key
+        run: |
+          if [ -n "$WISP_KEYSTORE_B64" ]; then
+            echo "$WISP_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wisp.p12"
+            echo "WISP_KEYSTORE=$RUNNER_TEMP/wisp.p12" >> "$GITHUB_ENV"
+          fi
+      - name: APKs
+        working-directory: android
+        run: |
+          mkdir -p ../dist
+          gradle --no-daemon assembleRelease -PwispAbis=arm64-v8a
+          cp app/build/outputs/apk/release/*.apk ../dist/
+          gradle --no-daemon assembleDebug -PwispAbis=x86_64
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apks
+          path: dist/*.apk
+
+  # Starts the app in an emulator with a few songs, and keeps the screenshots for a look.
+  android-emulator:
+    name: Android emulator check
+    needs: android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apks
+          path: apk
+      - name: Songs to play
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          mkdir -p music/Test_Artist/Test_Album
+          i=1
+          for hz in 220 262 330 392; do
+            ffmpeg -loglevel error -f lavfi -i "sine=frequency=$hz:duration=90" \
+              -metadata title="Test song $i" -metadata artist="Test Artist" -metadata album="Test Album" -metadata track="$i" \
+              -c:a libmp3lame -b:a 128k "music/Test_Artist/Test_Album/0${i}_song.mp3"
+            i=$((i + 1))
+          done
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash android/ci/emulator-check.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-screenshots
+          path: shots
+
+  # Installs the bundle the way a user would and starts it on a virtual screen with a virtual sound
+  # card, to prove that the sandbox lets the window and the sound through. The pictures are kept.
+  flatpak-smoke:
+    name: Flatpak runs
+    needs: flatpak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: WispPlayer-x86_64-x86_64.flatpak
+          path: bundle
+      - name: Tools
+        run: |
+          # bubblewrap (the sandbox) needs user namespaces, which Ubuntu 24.04 restricts by default
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak xvfb xdotool imagemagick pulseaudio pulseaudio-utils ffmpeg dbus-x11
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Install the bundle
+        run: flatpak install --user --noninteractive -y --bundle bundle/*.flatpak
+      - name: Songs
+        run: |
+          mkdir -p ~/Music/Test_Album
+          i=1
+          for hz in 220 262 330 392; do
+            ffmpeg -loglevel error -f lavfi -i "sine=frequency=$hz:duration=90" \
+              -metadata title="Test song $i" -metadata artist="Test Artist" -metadata album="Test Album" -metadata track="$i" \
+              -c:a libmp3lame -b:a 128k ~/Music/Test_Album/0${i}_song.mp3
+            i=$((i + 1))
+          done
+      - name: Start it, play a song
+        run: |
+          mkdir -p shots
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=virtual
+          Xvfb :99 -screen 0 1280x800x24 &
+          sleep 2
+          export DISPLAY=:99
+          dbus-run-session -- bash -c '
+            flatpak run --env=WISP_DEBUG=1 io.github.DividedsWhimsicalVHS.WispPlayer > shots/wisp.log 2>&1 &
+            sleep 25
+            import -window root shots/01-library.png
+            xdotool mousemove 700 400 key space
+            sleep 8
+            import -window root shots/02-playing.png
+            pactl list sink-inputs short > shots/sink-inputs.txt
+            flatpak kill io.github.DividedsWhimsicalVHS.WispPlayer
+          '
+          cat shots/wisp.log
+          echo "--- sound streams while playing:"
+          cat shots/sink-inputs.txt
+          test -s shots/sink-inputs.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flatpak-screenshots
+          path: shots

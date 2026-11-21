@@ -11,6 +11,7 @@ use std::time::Duration;
 use slint::{ComponentHandle, Image, Model, ModelRc, Rgb8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode, VecModel, Weak};
 
 use crate::art::Rgb;
+use crate::host::{self, MediaAction, NowPlaying};
 use crate::library::{self, Library, Progress, Sort};
 use crate::loader::{Done, Job, Loader, NowAssets};
 use crate::lyrics::{self, Lyrics};
@@ -73,6 +74,8 @@ struct State {
     total_tracks: usize,
 
     cur_uid: u32,
+    /// The song and play state last reported to the host (the phone's media notification).
+    announced: (u32, bool),
     cur_duration_ms: u64,
     lyrics: Option<Lyrics>,
     last_ended: u32,
@@ -121,6 +124,26 @@ fn on_ui_thread(f: impl FnOnce(&Ctl) + Send + 'static) {
             f(&ctl);
         }
     });
+}
+
+/// A media button was pressed outside the window (see [`host`]). Callable from any thread.
+pub fn media_action(action: MediaAction) {
+    on_ui_thread(move |ctl| match action {
+        MediaAction::Play => {
+            if !ctl.borrow().player.is_playing() {
+                toggle_play(ctl);
+            }
+        }
+        MediaAction::Pause => ctl.borrow().player.pause(),
+        MediaAction::Next => ctl.borrow().player.next(),
+        MediaAction::Prev => ctl.borrow().player.prev(),
+    });
+}
+
+/// Looks for new and changed files, e.g. once the phone's storage permission has been granted.
+/// Callable from any thread.
+pub fn rescan() {
+    on_ui_thread(start_scan);
 }
 
 fn to_image(a: &Rgb) -> Image {
@@ -198,6 +221,7 @@ pub fn run() -> Result<(), String> {
     }
 
     let ui = MainWindow::new().map_err(|e| e.to_string())?;
+    ui.global::<Theme>().set_touch(cfg!(mobile));
     let loader = Loader::spawn(|done| on_ui_thread(move |ctl| handle_done(ctl, done)));
     let playlists = Playlists::new(dir.join("Playlists"));
     let songs = TrackList::new(lib.clone());
@@ -224,6 +248,7 @@ pub fn run() -> Result<(), String> {
         rev: u32::MAX,
         total_tracks: 0,
         cur_uid: 0,
+        announced: (0, false),
         cur_duration_ms: 0,
         lyrics: None,
         last_ended: 0,
@@ -370,6 +395,7 @@ fn wire_callbacks(ui: &MainWindow, ctl: &Ctl) {
 
     // navigation and lists
     on!(app, ctl, on_show_page, |p| show_page(ctl, p));
+    on!(app, ctl, on_leave, | | host::leave());
     on!(app, ctl, on_search, |t| search_changed(ctl, t.to_string()));
     on!(app, ctl, on_sort_changed, |i| {
         {
@@ -1493,6 +1519,16 @@ fn on_tick(ctl: &Ctl) {
     };
     if active != app.get_lyrics_active() {
         app.set_lyrics_active(active);
+    }
+
+    // The phone's media notification follows the song and whether it plays.
+    {
+        let state = (ctl.borrow().cur_uid, app.get_playing());
+        if state != ctl.borrow().announced {
+            ctl.borrow_mut().announced = state;
+            let (title, artist) = if state.0 == 0 { Default::default() } else { (app.get_title(), app.get_artist()) };
+            host::now_playing(&NowPlaying { title: &title, artist: &artist, playing: state.1 });
+        }
     }
 
     // A scan (or anything else) changed the library: refresh lists.

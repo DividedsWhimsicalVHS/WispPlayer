@@ -9,6 +9,7 @@
 #   wisp-128.png    (next to this script) the window icon (ui/app.slint) and the logo in the README
 #   png\wisp-<size>.png   64, 128, 256 and 512 px for Linux icon themes and Android
 #   ..\..\installer\wizard-*.png   the pictures in the setup wizard (see installer\WispPlayer.iss)
+#   ..\..\android\app\src\main\res\drawable-nodpi\ic_launcher_foreground.png   the Android launcher icon
 #
 # The SVGs are rasterized with the headless Microsoft Edge that ships with Windows, so nothing
 # needs to be installed. Run:  powershell -ExecutionPolicy Bypass -File assets\icon\build-icons.ps1
@@ -85,6 +86,18 @@ $large = @"
   <text x="82" y="246" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#c9c2e0">gapless audio player</text>
 </svg>
 "@
+# The Android launcher icon has two layers that the system masks into a circle, a squircle...: the dark
+# tile is the background (android\app\src\main\res\drawable\ic_launcher_background.xml) and the player
+# alone is the foreground, scaled into the 66 dp safe zone of the 108 dp canvas (432 px here).
+$player = $inner -replace '<rect x="8" y="8" width="240" height="240" rx="58" fill="url\(#tile\)"/>', '' -replace '<path d="M8 66a58[^>]*fill="url\(#gloss\)"/>', ''
+$foreground = @"
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="432" height="432" viewBox="0 0 432 432">
+  <g transform="translate(216 216) scale(1.18) translate(-128 -130)">$player</g>
+</svg>
+"@
+$androidRes = [IO.Path]::GetFullPath((Join-Path $here "..\..\android\app\src\main\res\drawable-nodpi"))
+New-Item -ItemType Directory -Force $androidRes | Out-Null
+Convert-SvgToPng $foreground (Join-Path $androidRes "ic_launcher_foreground.png") 432 432
 Convert-SvgToPng $large (Join-Path $installerDir "wizard-large.png") 164 314
 Convert-SvgToPng $large (Join-Path $installerDir "wizard-large-2x.png") 328 628
 Convert-SvgToPng $full (Join-Path $installerDir "wizard-small.png") 55 55

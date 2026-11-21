@@ -1,3 +1,13 @@
 /target
 /dist
 /demo-music
+
+# Android: the library cargo-ndk drops into the Gradle project, Gradle's own files, and signing keys.
+/android/app/src/main/jniLibs
+/android/.gradle
+/android/build
+/android/app/build
+/android/local.properties
+*.jks
+*.keystore
+*.p12

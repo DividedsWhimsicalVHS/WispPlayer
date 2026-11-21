@@ -1,0 +1,22 @@
+[package]
+name = "wisp-android"
+version = "0.2.0"
+edition = "2024"
+description = "The Android launcher of Wisp Player"
+authors = ["Claude (Anthropic) <noreply@anthropic.com>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/DividedsWhimsicalVHS/WispPlayer"
+publish = false
+
+# The activity (a NativeActivity declared in the manifest) loads libwispplayer.so and calls
+# `android_main`. The name is also in AndroidManifest.xml (`android.app.lib_name`) and Bridge.java.
+[lib]
+name = "wispplayer"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wisp = { path = ".." }
+jni = "0.22"
+
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { version = "1.19", default-features = false, features = ["std", "compat-1-2", "backend-android-activity-06"] }

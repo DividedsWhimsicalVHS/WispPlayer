@@ -4,9 +4,12 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// Where Wisp keeps its library index and settings. `WISP_DATA_DIR` overrides it (tests, portable
-/// installs).
+/// Where Wisp keeps its library index and settings. The platform's own choice (Android's private app
+/// folder) comes first, then `WISP_DATA_DIR` (tests, portable installs).
 pub fn data_dir() -> PathBuf {
+    if let Some(dir) = crate::host::data_dir() {
+        return dir;
+    }
     if let Some(dir) = std::env::var_os("WISP_DATA_DIR") {
         return PathBuf::from(dir);
     }
@@ -23,6 +26,10 @@ pub fn data_dir() -> PathBuf {
 
 /// The user's music folder, used as the first library folder.
 pub fn default_music_dir() -> Option<PathBuf> {
+    // A phone has no home folder; its music lives in the shared storage's Music folder.
+    if cfg!(target_os = "android") {
+        return Some(PathBuf::from("/storage/emulated/0/Music"));
+    }
     let home = if cfg!(windows) { std::env::var_os("USERPROFILE") } else { std::env::var_os("HOME") }?;
     let dir = PathBuf::from(home).join("Music");
     dir.is_dir().then_some(dir)

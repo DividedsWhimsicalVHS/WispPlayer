@@ -11,6 +11,11 @@ keywords = ["audio", "music-player", "gapless", "slint"]
 categories = ["multimedia::audio"]
 publish = false
 
+# `cargo build` and `cargo test` here are the computer version. The Android library is built on its own
+# (see android/README.md) because it is a second, much slower link of the same code.
+[workspace]
+members = ["android"]
+
 [features]
 screenshot = []
 

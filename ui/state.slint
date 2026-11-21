@@ -5,10 +5,19 @@ import { TrackRow, QueueRow, AlbumData, ArtistData, LyricLine, DeviceRow, Result
 
 export global App {
     // -- navigation: 0 songs, 1 albums, 2 artists, 3 queue, 4 settings, 5 album detail,
-    //    6 playlist, 7 unidentified tracks
+    //    6 playlist, 7 unidentified tracks, 8 the list of playlists (narrow windows only: wide ones
+    //    list them in the sidebar)
     in-out property <int> page: 0;
     in-out property <bool> np-open: false;
+    /// Now playing: 0 lyrics, 1 up next, -1 the player itself (narrow windows only).
     in-out property <int> np-tab: 0;
+    /// The window is narrow (a phone held upright): tabs along the bottom, a mini player, one pane
+    /// at a time. Set by the window from its own width.
+    in-out property <bool> compact: false;
+    /// The row of `tracks` whose action sheet is open (narrow windows), or -1.
+    in-out property <int> sheet-row: -1;
+    /// That row belongs to a playlist, so it can also be taken out of it.
+    in-out property <bool> sheet-removable: false;
     in-out property <string> search-text: "";
     in-out property <string> toast: "";
 
@@ -148,7 +157,51 @@ export global App {
     in-out property <bool> ed-saving: false;
     in-out property <string> ed-error: "";
 
+    /// Steps out of the innermost thing that is open (editor, dialog, menu, sheet, now playing, a
+    /// detail page) and says whether there was one. Back button and Escape.
+    public function back() -> bool {
+        if (ed-open) {
+            ed-close();
+            return true;
+        }
+        if (dialog != 0) {
+            dialog = 0;
+            return true;
+        }
+        if (menu-open) {
+            menu-open = false;
+            return true;
+        }
+        if (sheet-row >= 0) {
+            sheet-row = -1;
+            return true;
+        }
+        if (np-open) {
+            np-open = false;
+            return true;
+        }
+        if (page == 5) {
+            show-page(1);
+            return true;
+        }
+        if (page == 7) {
+            show-page(4);
+            return true;
+        }
+        if (page == 6 && compact) {
+            show-page(8);
+            return true;
+        }
+        if (page != 0) {
+            show-page(0);
+            return true;
+        }
+        false
+    }
+
     // -- callbacks (implemented in Rust)
+    /// Back was pressed with nothing left to step out of.
+    callback leave();
     callback play-row(int);
     callback play-next-row(int);
     callback enqueue-row(int);

@@ -3,6 +3,8 @@
 //! The program is this library plus thin launchers: `src/main.rs` for computers, and the `android`
 //! crate, whose `android_main` hands the Android activity to the same [`run`].
 
+pub mod host;
+
 mod app;
 mod art;
 mod edit;
